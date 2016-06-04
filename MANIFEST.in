@@ -1,0 +1,5 @@
+include Makefile
+include requirements.txt
+include easybase/*.thrift
+include easybase/gen-py/hbase/*.py
+include *.md *.rst
