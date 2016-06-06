@@ -8,7 +8,7 @@ import Queue
 import socket
 import threading
 
-from thriftpy.thrift import TException
+from thrift.Thrift import TException
 
 from .connection import Connection
 

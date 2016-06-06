@@ -1,9 +1,13 @@
 import easybase
+import os
 
-conn = easybase.Connection('localhost', port=9090, timeout=20000)
+host = os.getenv('HBASE_HOST','localhost')
+port = os.getenv('HBASE_PORT', 9090)
+table_name = os.getenv('HBASE_TABLE','test1')
 
-table = "test1"
-tbl = conn.table(table)
+conn = easybase.Connection(host, port=port, timeout=20000)
+
+tbl = conn.table(table_name)
 
 # simple put
 puts={'cf1:c1': 'v1', 'cf1:c2': 'v2', 'cf2:c3': 'v3'}
@@ -64,5 +68,14 @@ tbl.delete('r1',timestamp=ts)
 print "delete row id = r2 and ['cf1:c1']"
 tbl.delete('r2',['cf1:c2'])
 
-
 conn.close()
+
+print "test connection pool"
+
+pool = easybase.ConnectionPool(size=5,host=host,port=port)
+
+with pool.connection() as connect:
+    tbl = connect.table(table_name)
+    tbl.put(row='r4', data=puts, timestamp=ts)
+    print tbl.row(row='r5')
+

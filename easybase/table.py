@@ -10,7 +10,6 @@ from struct import Struct
 from hbase.ttypes import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete
 
 from .util import thrift_type_to_dict, str_increment, OrderedDict
-from .batch import Batch
 
 logger = logging.getLogger(__name__)
 
@@ -377,7 +376,8 @@ class Table(object):
         self.connection.client.put(self.name, tput)
 
 
-    def puts(self,rows,):
+    def puts(self,rows):
+        pass
     def delete(self, row, columns=None, timestamp=None, deletetype=1, attributes=None, durability=False):
         """Delete data from the table.
 
