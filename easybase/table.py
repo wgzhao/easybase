@@ -375,8 +375,7 @@ class Table(object):
         tput = TPut(row=row, columnValues=cols, durability=wal, timestamp=timestamp)
         self.connection.client.put(self.name, tput)
 
-
-    def puts(self,rows):
+    def puts(self, rows):
         pass
     def delete(self, row, columns=None, timestamp=None, deletetype=1, attributes=None, durability=False):
         """Delete data from the table.
