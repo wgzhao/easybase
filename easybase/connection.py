@@ -10,22 +10,22 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TFramedTransport
 from thrift.protocol import TBinaryProtocol, TCompactProtocol
 
-from hbase.THBaseService import Client
-from hbase.ttypes import *
+from .hbase.THBaseService import Client
+from .hbase.ttypes import *
 
 from .table import Table
 from .util import pep8_to_camel_case
 
 logger = logging.getLogger(__name__)
 
-COMPAT_MODES = ('0.90', '0.92', '0.94', '0.96')
+COMPAT_MODES = ('0.90', '0.92', '0.94', '0.96', '2.2.0')
 THRIFT_TRANSPORTS = dict(
     buffered=TBufferedTransport,
     framed=TFramedTransport,
 )
 THRIFT_PROTOCOLS = dict(
     binary=TBinaryProtocol.TBinaryProtocol,
-    compact=TCompactProtocol,
+    compact=TCompactProtocol.TCompactProtocol,
 )
 
 DEFAULT_HOST = 'localhost'
@@ -113,10 +113,10 @@ class Connection(object):
                              % ", ".join(THRIFT_TRANSPORTS.keys()))
 
         if table_prefix is not None \
-                and not isinstance(table_prefix, basestring):
+                and not isinstance(table_prefix, str):
             raise TypeError("'table_prefix' must be a string")
 
-        if not isinstance(table_prefix_separator, basestring):
+        if not isinstance(table_prefix_separator, str):
             raise TypeError("'table_prefix_separator' must be a string")
 
         if compat not in COMPAT_MODES:

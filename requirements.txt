@@ -2,3 +2,4 @@ thrift > 0.8.9
 thriftpy>=0.3.7
 ujson>=1.33
 python>=2.7
+six>=1.7
