@@ -5,6 +5,7 @@ These functions are not part of the public API.
 """
 
 import re
+from six.moves import xrange
 
 CAPITALS = re.compile('([A-Z])')
 
