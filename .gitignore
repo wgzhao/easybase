@@ -5,4 +5,5 @@ build
 *.egg-info
 tests
 .coverage
-
+.vscode
+__pycache__/

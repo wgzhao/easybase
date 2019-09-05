@@ -3,11 +3,12 @@ EasyBase table module.
 """
 import time
 import logging
+from six import iteritems
 from numbers import Integral
 from operator import attrgetter
 from struct import Struct
 
-from hbase.ttypes import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete
+from .hbase.ttypes import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete
 
 from .util import thrift_type_to_dict, str_increment, OrderedDict
 
@@ -46,7 +47,7 @@ def make_columns(cols):
     columns=[]
     for c in cols:
         f, q = c.split(':')
-        columns.append(TColumn(family=f, qualifier=q))
+        columns.append(TColumn(family=f.encode(), qualifier=q.encode()))
     return columns
 
 
@@ -56,9 +57,9 @@ def make_columnvalue(data):
     :return list of TColumnValue
     """
     cols = []
-    for column, value in data.iteritems():
+    for column, value in iteritems(data):
         f, q = column.split(":")
-        cols.append(TColumnValue(family=f, qualifier=q, value=value))
+        cols.append(TColumnValue(family=f.encode(), qualifier=q.encode(), value=value.encode()))
     return cols
 
 def make_row(cell_map, include_timestamp):
@@ -70,7 +71,7 @@ def make_row(cell_map, include_timestamp):
     rs = []
     tmp_d = dict()
     for r in cell_map:
-        tmp_d[r.family + ':' + r.qualifier] = r.value
+        tmp_d[r.family.decode() + ':' + r.qualifier.decode()] = r.value.decode()
         tmp_d['timestamp'] = r.timestamp
         rs.append(tmp_d)
     return rs
@@ -93,7 +94,7 @@ class Table(object):
     instead.
     """
     def __init__(self, name, connection):
-        self.name = name
+        self.name = name.encode()
         self.connection = connection
 
     def __repr__(self):
@@ -161,7 +162,7 @@ class Table(object):
         cols = make_columns(columns)
         tt = make_timerange(timerange)
 
-        tget=TGet(row=row,columns=cols,timestamp=timestamp,timeRange=tt,maxVersions=maxversions)
+        tget=TGet(row=row.encode(),columns=cols,timestamp=timestamp,timeRange=tt,maxVersions=maxversions)
         result = self.connection.client.get(self.name,tget)
         if not result:
             return {}
@@ -292,11 +293,11 @@ class Table(object):
                     "'row_prefix' cannot be combined with 'row_start' "
                     "or 'row_stop'")
 
-            row_start = row_prefix
-            row_stop = str_increment(row_prefix)
+            row_start = row_prefix.encode()
+            row_stop = str_increment(row_prefix.encode())
 
         if row_start is None:
-            row_start = ''
+            row_start = b''
 
         cols = make_columns(columns)
         tt = make_timerange(timerange)
@@ -372,7 +373,7 @@ class Table(object):
             wal = self.wal
         cols = make_columnvalue(data)
 
-        tput = TPut(row=row, columnValues=cols, durability=wal, timestamp=timestamp)
+        tput = TPut(row=row.encode(), columnValues=cols, durability=wal, timestamp=timestamp)
         self.connection.client.put(self.name, tput)
 
     def puts(self, rows):
@@ -404,7 +405,7 @@ class Table(object):
         :param int durability:
         """
         cols = make_columns(columns)
-        tdelete = TDelete(row=row, columns=cols, timestamp=timestamp, deleteType=deletetype, attributes=attributes, durability=durability)
+        tdelete = TDelete(row=row.encode(), columns=cols, timestamp=timestamp, deleteType=deletetype, attributes=attributes, durability=durability)
         self.connection.client.deleteSingle(self.name,tdelete)
 
     #
