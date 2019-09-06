@@ -24,7 +24,7 @@ setup(
     name='easybase',
     version=__version__,
     description="""A developer-friendly Python library to interact with Apache HBase,support thrift2. It's heavily references to happybase. thank Wouter Bolsterlee""",
-    long_description=get_file_contents('README.md'),
+    long_description=get_file_contents('README.rst'),
     author="wgzhao",
     author_email="wgzhao@gmail.com",
     url='https://github.com/wgzhao/easybase',
