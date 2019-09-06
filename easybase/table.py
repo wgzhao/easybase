@@ -30,7 +30,7 @@ def make_timerange(ts):
         raise TypeError("'timerange' must be  list or tuple")
     if len(ts) == 1:
         # only one element, take it as  min timestamp
-        ts[1]=time.now()
+        ts[1] = int(time.time())
 
     return TTimeRange(minStamp=ts[0],maxStamp=ts[1])
 
@@ -101,7 +101,7 @@ class Table(object):
         return '<%s.%s name=%r>' % (
             __name__,
             self.__class__.__name__,
-            self.name,
+            self.name.decode(),
         )
 
     def families(self):
@@ -202,7 +202,7 @@ class Table(object):
     def scan(self, row_start=None, row_stop=None, row_prefix=None,
              columns=None, filter=None, timerange=None,
              include_timestamp=False, batch_size=1000, scan_batching=None,
-             limit=None, reversed=False):
+             limit=None, reversed=False, max_version=1):
         """Create a scanner for data in the table.
 
         This method returns an iterable that can be used for looping over the
@@ -248,6 +248,9 @@ class Table(object):
         by this scanner will be retrieved in sorted order, and the data
         will be stored in `OrderedDict` instances.
 
+        The optional `max_version` argument specifies how many versions should be
+        retrieved per row  
+
         **Compatibility notes:**
 
         * The `filter` argument is only available when using HBase 0.92
@@ -274,10 +277,19 @@ class Table(object):
         :param bool scan_batching: server-side scan batching (optional)
         :param int limit: max number of rows to return
         :param bool reversed: whether to reversed
+        :param int max_version: number of row's versions (optional)
 
         :return: generator yielding the rows matching the scan
         :rtype: iterable of `(row_key, row_data)` tuples
         """
+        #convert to bytes 
+        if row_start:
+            row_start = row_start.encode()
+        else:
+            row_start = b''
+        if row_stop:
+            row_stop = row_stop.encode()
+
         if batch_size < 1:
             raise ValueError("'batch_size' must be >= 1")
 
@@ -294,7 +306,7 @@ class Table(object):
                     "or 'row_stop'")
 
             row_start = row_prefix.encode()
-            row_stop = str_increment(row_prefix.encode())
+            row_stop = str_increment(row_prefix).encode()
 
         if row_start is None:
             row_start = b''
@@ -311,7 +323,9 @@ class Table(object):
             filterString=filter,
             batchSize=scan_batching,
             reversed=reversed,
+            maxVersions=max_version,
         )
+        
         scan_id = self.connection.client.openScanner(self.name, tscan)
 
         logger.debug("Opened scanner (id=%d) on '%s'", scan_id, self.name)
@@ -335,7 +349,7 @@ class Table(object):
                 for n_returned, item in enumerate(items, n_returned + 1):
                     row = make_row(item.columnValues, include_timestamp)
 
-                    yield item.row, row
+                    yield item.row.decode(), row
 
                     if limit is not None and n_returned == limit:
                         return  # scan has finished
@@ -369,8 +383,8 @@ class Table(object):
         :param int timestamp: timestamp (optional)
         :param wal bool: whether to write to the WAL (optional)
         """
-        if wal is None:
-            wal = self.wal
+        #if wal is None:
+        #    wal = self.wal
         cols = make_columnvalue(data)
 
         tput = TPut(row=row.encode(), columnValues=cols, durability=wal, timestamp=timestamp)
@@ -378,6 +392,7 @@ class Table(object):
 
     def puts(self, rows):
         pass
+
     def delete(self, row, columns=None, timestamp=None, deletetype=1, attributes=None, durability=False):
         """Delete data from the table.
 
@@ -479,3 +494,12 @@ class Table(object):
         :rtype: int
         """
         return self.counter_inc(row, column, -value)
+
+    def truncate(self):
+        """truncate table
+
+        This method will delete all rows in table
+
+        :return True if successfully else False
+        """
+        return self.connection.client.truncateTable(self.name, True)

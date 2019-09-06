@@ -5,13 +5,14 @@ EasyBase connection module.
 """
 
 import logging
+from six import iteritems, binary_type, text_type
 
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TFramedTransport
 from thrift.protocol import TBinaryProtocol, TCompactProtocol
 
 from .hbase.THBaseService import Client
-from .hbase.ttypes import *
+from .hbase.ttypes import TTableName, TTimeRange, TTransport, TColumnFamilyDescriptor, TTableDescriptor
 
 from .table import Table
 from .util import pep8_to_camel_case
@@ -34,6 +35,7 @@ DEFAULT_TRANSPORT = 'buffered'
 DEFAULT_COMPAT = '0.96'
 DEFAULT_PROTOCOL = 'binary'
 
+STRING_OR_BINARY = (binary_type, text_type)
 
 class Connection(object):
     """Connection to an HBase Thrift server.
@@ -236,15 +238,16 @@ class Connection(object):
         :return: The table names
         :rtype: List of strings
         """
-        names = self.client.getTableNames()
+        raise NotImplementedError("not implemented yet")
+        # names = self.client.getTableNames()
 
-        # Filter using prefix, and strip prefix from names
-        if self.table_prefix is not None:
-            prefix = self._table_name('')
-            offset = len(prefix)
-            names = [n[offset:] for n in names if n.startswith(prefix)]
+        # # Filter using prefix, and strip prefix from names
+        # if self.table_prefix is not None:
+        #     prefix = self._table_name('')
+        #     offset = len(prefix)
+        #     names = [n[offset:] for n in names if n.startswith(prefix)]
 
-        return names
+        # return names
 
     def create_table(self, name, families):
         """Create a table.
@@ -288,22 +291,28 @@ class Connection(object):
                 "Cannot create table %r (no column families specified)"
                 % name)
 
-        column_descriptors = []
-        for cf_name, options in families.iteritems():
-            if options is None:
-                options = dict()
+        #table_descriptors = [{'tableName': name.encode()}]
+        family_desc = []
+        for cf_name, _ in iteritems(families):
+            # if options is None:
+            #     options = dict()
 
-            kwargs = dict()
-            for option_name, value in options.iteritems():
-                kwargs[pep8_to_camel_case(option_name)] = value
+            # kwargs = dict()
+            # for option_name, value in iteritems(options):
+            #     if isinstance(value, STRING_OR_BINARY):
+            #         value = value.encode()
 
-            if not cf_name.endswith(':'):
-                cf_name += ':'
-            kwargs['name'] = cf_name
+            #     kwargs[pep8_to_camel_case(option_name)] = value
 
-            column_descriptors.append(ColumnDescriptor(**kwargs))
+            # if not cf_name.endswith(':'):
+            #     cf_name += ':'
+            # kwargs['name'] = cf_name.encode()
+            #table_descriptors.append(TTableDescriptor(**kwargs))
+            family_desc.append(TColumnFamilyDescriptor(name=cf_name.encode(), maxVersions=1000))
 
-        self.client.createTable(name, column_descriptors)
+        tbl_name = TTableName(ns=None, qualifier=name.encode())
+        tdesc = TTableDescriptor(tableName=tbl_name, columns = family_desc)
+        self.client.createTable(tdesc, splitKeys=None)
 
     def delete_table(self, name, disable=False):
         """Delete the specified table.
@@ -318,18 +327,18 @@ class Connection(object):
         :param str name: The table name
         :param bool disable: Whether to first disable the table if needed
         """
-        if disable and self.is_table_enabled(name):
-            self.disable_table(name)
+        tbl_name = TTableName(ns=None, qualifier=self._table_name(name).encode())
+        if disable and self.is_table_enabled(tbl_name):
+            self.disable_table(tbl_name)
 
-        name = self._table_name(name)
-        self.client.deleteTable(name)
+        self.client.deleteTable(tbl_name)
 
     def enable_table(self, name):
         """Enable the specified table.
 
         :param str name: The table name
         """
-        name = self._table_name(name)
+        #name = self._table_name(name)
         self.client.enableTable(name)
 
     def disable_table(self, name):
@@ -337,7 +346,7 @@ class Connection(object):
 
         :param str name: The table name
         """
-        name = self._table_name(name)
+        #name = self._table_name(name)
         self.client.disableTable(name)
 
     def is_table_enabled(self, name):
@@ -348,7 +357,7 @@ class Connection(object):
         :return: whether the table is enabled
         :rtype: bool
         """
-        name = self._table_name(name)
+        #name = self._table_name(name)
         return self.client.isTableEnabled(name)
 
     def compact_table(self, name, major=False):
@@ -357,8 +366,19 @@ class Connection(object):
         :param str name: The table name
         :param bool major: Whether to perform a major compaction.
         """
-        name = self._table_name(name)
-        if major:
-            self.client.majorCompact(name)
-        else:
-            self.client.compact(name)
+        raise NotImplementedError("not implement yet")
+        # name = self._table_name(name)
+        # if major:
+        #     self.client.majorCompact(name)
+        # else:
+        #     self.client.compact(name)
+    
+    def exist_table(self, name):
+        """Return whether the sepcified table is exists
+
+        :param str name: The table name
+        :return whether the table is exists
+        :rtype: bool
+        """
+        name = TTableName(ns=None, qualifier=self._table_name(name).encode())
+        return self.client.tableExists(name)
