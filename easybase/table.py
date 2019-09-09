@@ -8,7 +8,7 @@ from numbers import Integral
 from operator import attrgetter
 from struct import Struct
 
-from .hbase.ttypes import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete
+from .hbase.ttypes import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete, TTableName
 
 from .util import thrift_type_to_dict, str_increment, OrderedDict
 
@@ -94,14 +94,14 @@ class Table(object):
     instead.
     """
     def __init__(self, name, connection):
-        self.name = name.encode()
+        self.name = name
         self.connection = connection
 
     def __repr__(self):
         return '<%s.%s name=%r>' % (
             __name__,
             self.__class__.__name__,
-            self.name.decode(),
+            self.name,
         )
 
     def families(self):
@@ -110,11 +110,11 @@ class Table(object):
         :return: Mapping from column family name to settings dict
         :rtype: dict
         """
-        descriptors = self.connection.client.getColumnDescriptors(self.name)
-        families = dict()
-        for name, descriptor in descriptors.items():
-            name = name.rstrip(':')
-            families[name] = thrift_type_to_dict(descriptor)
+        descriptor = self.connection.client.getTableDescriptor(self.get_tablename())
+        
+        # convert bytes to string
+        families = {cf.name: self._bytes2str(cf.attributes) for cf in descriptor.columns}
+
         return families
 
     def _column_family_names(self):
@@ -163,7 +163,7 @@ class Table(object):
         tt = make_timerange(timerange)
 
         tget=TGet(row=row.encode(),columns=cols,timestamp=timestamp,timeRange=tt,maxVersions=maxversions)
-        result = self.connection.client.get(self.name,tget)
+        result = self.connection.client.get(self.name.encode(),tget)
         if not result:
             return {}
         return make_row(result.columnValues, include_timestamp)
@@ -326,7 +326,7 @@ class Table(object):
             maxVersions=max_version,
         )
         
-        scan_id = self.connection.client.openScanner(self.name, tscan)
+        scan_id = self.connection.client.openScanner(self.name.encode(), tscan)
 
         logger.debug("Opened scanner (id=%d) on '%s'", scan_id, self.name)
 
@@ -388,7 +388,7 @@ class Table(object):
         cols = make_columnvalue(data)
 
         tput = TPut(row=row.encode(), columnValues=cols, durability=wal, timestamp=timestamp)
-        self.connection.client.put(self.name, tput)
+        self.connection.client.put(self.name.encode(), tput)
 
     def puts(self, rows):
         pass
@@ -421,7 +421,7 @@ class Table(object):
         """
         cols = make_columns(columns)
         tdelete = TDelete(row=row.encode(), columns=cols, timestamp=timestamp, deleteType=deletetype, attributes=attributes, durability=durability)
-        self.connection.client.deleteSingle(self.name,tdelete)
+        self.connection.client.deleteSingle(self.name.encode(), tdelete)
 
     #
     # Atomic counters
@@ -503,3 +503,17 @@ class Table(object):
         :return True if successfully else False
         """
         return self.connection.client.truncateTable(self.name, True)
+
+    def get_tablename(self):
+        """Return the py:class:TTableName class of the spcified table name
+
+        :return the py:class:TTableName Class
+        :rtype: class
+        """
+        return TTableName(ns=None, qualifier=self.name.encode())
+
+    def _bytes2str(self,obj):
+        if isinstance(obj, bytes):
+            return obj.decode()
+        if isinstance(obj, dict):
+            return {x.decode():y.decode() for x,y in iteritems(obj) }

@@ -293,22 +293,23 @@ class Connection(object):
 
         #table_descriptors = [{'tableName': name.encode()}]
         family_desc = []
-        for cf_name, _ in iteritems(families):
-            # if options is None:
-            #     options = dict()
+        for cf_name, options in iteritems(families):
+            if options is None:
+                options = dict()
+            
+            kwargs = dict()
+            for option_name, value in iteritems(options):
+                if isinstance(value, STRING_OR_BINARY):
+                    value = value.encode()
 
-            # kwargs = dict()
-            # for option_name, value in iteritems(options):
-            #     if isinstance(value, STRING_OR_BINARY):
-            #         value = value.encode()
-
-            #     kwargs[pep8_to_camel_case(option_name)] = value
+                kwargs[pep8_to_camel_case(option_name)] = value
 
             # if not cf_name.endswith(':'):
             #     cf_name += ':'
             # kwargs['name'] = cf_name.encode()
             #table_descriptors.append(TTableDescriptor(**kwargs))
-            family_desc.append(TColumnFamilyDescriptor(name=cf_name.encode(), maxVersions=1000))
+            cf = TColumnFamilyDescriptor(name=cf_name.encode(), **kwargs)
+            family_desc.append(cf)
 
         tbl_name = TTableName(ns=None, qualifier=name.encode())
         tdesc = TTableDescriptor(tableName=tbl_name, columns = family_desc)
@@ -327,11 +328,10 @@ class Connection(object):
         :param str name: The table name
         :param bool disable: Whether to first disable the table if needed
         """
-        tbl_name = TTableName(ns=None, qualifier=self._table_name(name).encode())
-        if disable and self.is_table_enabled(tbl_name):
-            self.disable_table(tbl_name)
+        if disable and self.is_table_enabled(name):
+            self.disable_table(name)
 
-        self.client.deleteTable(tbl_name)
+        self.client.deleteTable(self.get_tablename(name))
 
     def enable_table(self, name):
         """Enable the specified table.
@@ -339,15 +339,15 @@ class Connection(object):
         :param str name: The table name
         """
         #name = self._table_name(name)
-        self.client.enableTable(name)
+        self.client.enableTable(self.get_tablename(name))
 
     def disable_table(self, name):
         """Disable the specified table.
 
         :param str name: The table name
         """
-        #name = self._table_name(name)
-        self.client.disableTable(name)
+        #name = self._table_name(name).encode()
+        self.client.disableTable(self.get_tablename(name))
 
     def is_table_enabled(self, name):
         """Return whether the specified table is enabled.
@@ -357,8 +357,8 @@ class Connection(object):
         :return: whether the table is enabled
         :rtype: bool
         """
-        #name = self._table_name(name)
-        return self.client.isTableEnabled(name)
+        #name = self._table_name(name).encode()
+        return self.client.isTableEnabled(self.get_tablename(name))
 
     def compact_table(self, name, major=False):
         """Compact the specified table.
@@ -380,5 +380,13 @@ class Connection(object):
         :return whether the table is exists
         :rtype: bool
         """
-        name = TTableName(ns=None, qualifier=self._table_name(name).encode())
-        return self.client.tableExists(name)
+        return self.client.tableExists(self.get_tablename(name))
+
+    def get_tablename(self, name):
+        """Return the py:class:TTableName class of the spcified table name
+
+        :param str name: The table name
+        :return the py:class:TTableName Class
+        :rtype: class
+        """
+        return TTableName(ns=None, qualifier=self._table_name(name).encode())
