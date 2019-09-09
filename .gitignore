@@ -3,7 +3,7 @@ coverage
 dist
 build
 *.egg-info
-tests
 .coverage
 .vscode
 __pycache__/
+.eggs/
