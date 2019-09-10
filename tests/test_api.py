@@ -12,6 +12,8 @@ import time
 from six.moves import range
 from six import text_type, iteritems
 
+from thriftpy2.thrift import TDecodeException
+
 from nose.tools import (
     assert_dict_equal,
     assert_equal,
@@ -222,6 +224,73 @@ def test_row():
     assert_dict_equal(rs, row(rk, timestamp=456, include_timestamp=True))
     assert_dict_equal({}, row(rk, timestamp=111, include_timestamp=True))
 
+def test_rows():
+    row_keys = ['rk_1', 'rk_2','rk_3']
+    old_value = {'cf1:c1':'v_old_c1', 'cf1:c2':'v_old_c2'}
+    new_value = {'cf1:c1':'v_new_c1', 'cf1:c2':'v_new_c2'}
+
+    # with assert_raises(TypeError):
+    #     table.rows(row_keys, object())
+
+    with assert_raises(TDecodeException):
+        table.rows(row_keys, timestamp='invalid_timestamp')
+
+    for rk in row_keys:
+        table.put(rk, old_value, timestamp=111)
+    
+    for rk in row_keys:
+        table.put(rk, new_value)
+
+    assert_dict_equal({}, table.rows([]))
+
+    rows = dict(table.rows(row_keys))
+
+    for rk in row_keys:
+        assert_in(rk, rows)
+        assert_dict_equal(new_value, rows[rk])
+
+    rows = dict(table.rows(row_keys, timestamp=222))
+    assert_dict_equal({None: {}}, rows)
+
+def test_scan():
+    with assert_raises(TypeError):
+        list(table.scan(row_prefix='foo', row_start='bar'))
+
+    if connection.compat == '0.99':
+        with assert_raises(NotImplementedError):
+            list(table.scan(filter='foo'))
+
+    with assert_raises(ValueError):
+        list(table.scan(limit=0))
+
+    # write mass rows
+    for i in range(1000):
+        table.put(
+            'rk_scan_{:04}'.format(i),
+            {
+                'cf1:c1': 'v1',
+                'cf2:c2': 'v2',
+            }
+        )
+
+    def calc_rows(scanner):
+        return len(list(scanner))
+
+    scanner = table.scan(row_start='rk_scan_0010', row_stop='rk_scan_0020', columns=['cf1:c1'])
+    assert_equal(10, calc_rows(scanner))
+    
+    scanner = table.scan(row_start='non_exists', row_stop='end_stop')
+    assert_equal(0, calc_rows(scanner))
+
+    scanner = table.scan(row_start='rk_scan_', row_stop='rk_scan_0010', columns=['cf2:c2'])
+
+    rk, row = next(scanner)
+    assert_equal(rk, 'rk_scan_0000')
+    assert_equal(10-1, calc_rows(scanner))
+
+    scanner = table.scan(row_start='rk_scan_', row_stop='rk_scan_0100', columns=['cf2:c2'], limit=10)
+    assert_equal(10, calc_rows(scanner))
+    
 @nottest
 def test_get():
     rs = table.row('r1')
