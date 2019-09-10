@@ -535,3 +535,33 @@ class Table(object):
             return obj.decode()
         if isinstance(obj, dict):
             return {x.decode():y.decode() for x,y in iteritems(obj) }
+
+
+    def batch(self, timestamp=None, batch_size=None, transaction=False):
+        """Create a new batch operation for current table
+
+        This method returns a new :py:class:`Batch` instance that can be 
+        used for mass data manipulation. The `timestamp` argument applies 
+        all puts and deletes on the batch
+
+        If given, the `batch_size` argument specifies the maximum batch size
+        after which the batch should send the mutations to the server, By 
+        default this is unbounded.
+
+        The `transaction` argument specifies wether the returned :py:class:`Batch`
+        instance should act in a transaction-like manner when used as context manager
+        in a ``with`` block of code. The `transaction` flag cannot be used in combination
+        with `batch_size`.
+
+        :param int timestamp: timestamp (optional)
+        :param int batch_size: batch size (optional)
+        :param bool transaction: whether this batch should behave like a transaction
+
+        :return: Batch instance
+        :rtype: :py:class:`Batch`
+        """
+        raise NotImplementedError
+        # kwargs = locals().copy()
+
+        # del kwargs['self']
+        # return Batch(table=self, **kwargs)
