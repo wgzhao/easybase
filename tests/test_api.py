@@ -6,10 +6,11 @@ import os
 import random
 import collections
 import threading
+import time 
 
-import six
+
 from six.moves import range
-
+from six import text_type, iteritems
 
 from nose.tools import (
     assert_dict_equal,
@@ -109,8 +110,8 @@ def test_prefix():
 
 def test_families():
     families = table.families()
-    for name, fdesc in six.iteritems(families):
-        assert_is_instance(name, bytes)
+    for name, fdesc in iteritems(families):
+        assert_is_instance(name, text_type)
         assert_is_instance(fdesc, dict)
         #assert_is_instance(fdesc['BLOCKSIZE'], int)
         assert_in('VERSIONS', fdesc)
@@ -193,12 +194,11 @@ def test_row():
     with assert_raises(TypeError):
         row(rk, 123)
 
-
     put(rk, {'cf1:c1': 'v1'}, timestamp=123)
     put(rk, {'cf1:c1': 'v2'}, timestamp=456)
     put(rk, {'cf1:c2': 'v3',
             'cf2:c1': 'v4'})
-    put(rk, {'cf2:c2', 'v5'}, timestamp=789)
+    put(rk, {'cf2:c2': 'v5'}, timestamp=789)
 
     rs = {
         'cf1:c1': 'v2',
@@ -206,7 +206,21 @@ def test_row():
         'cf2:c1': 'v4',
         'cf2:c2': 'v5'
     }
-    assert_dict_equal(rs, row(rk))
+
+
+    assert_dict_equal(rs, row(rk, include_timestamp=False))
+
+    rs =  {'cf1:c1':[('v2',456),],
+         'cf2:c2': [('v5', 789),],
+         }
+    
+    assert_dict_equal(rs, row(rk, columns=['cf1:c1','cf2:c2'], include_timestamp=True))
+
+    rs = {
+        'cf1:c1': [('v2',456),]
+    }
+    assert_dict_equal(rs, row(rk, timestamp=456, include_timestamp=True))
+    assert_dict_equal({}, row(rk, timestamp=111, include_timestamp=True))
 
 @nottest
 def test_get():
@@ -214,6 +228,7 @@ def test_get():
     assert_is_instance(rs, list)
     assert_equal(len(rs), 1)
     #assert_equal(rs[0])
+
 
 if __name__ == '__main__':
     import logging

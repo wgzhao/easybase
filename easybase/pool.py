@@ -8,7 +8,7 @@ from six.moves import queue, range, xrange
 import socket
 import threading
 
-from thrift.Thrift import TException
+from thriftpy2.thrift import TException
 
 from .connection import Connection
 
