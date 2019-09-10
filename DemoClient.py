@@ -19,7 +19,7 @@ if conn.exist_table(table_name):
 
 # create table 
 print("create table {}".format(table_name))
-conn.create_table(table_name, {'cf1':dict(),'cf2':{'max_version':2000}})
+conn.create_table(table_name, {'cf1':dict(),'cf2':{'max_versions':2000}})
 
 #sys.exit(1)
 tbl = conn.table(table_name)

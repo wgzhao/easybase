@@ -19,7 +19,7 @@ from .util import pep8_to_camel_case
 
 logger = logging.getLogger(__name__)
 
-COMPAT_MODES = ('0.90', '0.92', '0.94', '0.96', '2.2.0')
+COMPAT_MODES = ('0.90', '0.92', '0.94', '0.96', '0.98', '2.2.0')
 THRIFT_TRANSPORTS = dict(
     buffered=TBufferedTransport,
     framed=TFramedTransport,
