@@ -9,3 +9,4 @@ __pycache__/
 .eggs/
 py3/
 py2/
+.tox/

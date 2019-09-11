@@ -1,6 +1,25 @@
 EasyBase
 ========
 
+.. image:: https://travis-ci.com/wgzhao/easybase.svg?branch=master
+    :target: https://travis-ci.com/wgzhao/easybase
+
+.. image:: https://img.shields.io/codecov/c/github/wgzhao/easybase.svg
+    :target: https://codecov.io/gh/wgzhao/easybase
+
+.. image:: https://img.shields.io/pypi/dm/easybase.svg
+    :target: https://pypi.org/project/easybase/
+
+.. image:: https://img.shields.io/pypi/v/easybase.svg
+    :target: https://pypi.org/project/easybase/
+
+.. image:: https://img.shields.io/pypi/pyversions/easybase.svg
+    :target: https://pypi.org/project/easybase/
+
+.. image:: https://img.shields.io/pypi/implementation/easybase.svg
+    :target: https://pypi.org/project/easybase/
+
+
 **EasyBase** is a developer-friendly Python library to interact with
 `Apache HBase <https://hbase.apache.org>`__ . The orignal source code
 forked from `HappyBase <https://github.com/wbolster/happybase>`__.
