@@ -38,5 +38,5 @@ export PATH=$PATH:$HBASE_HOME/bin
 #start hbase server and thriftserver
 bin/start-hbase.sh
 sleep 2
-bin/hadoo-daemon.sh start thrift2
+bin/hbase-daemon.sh start thrift2
 sleep 2
