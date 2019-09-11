@@ -303,8 +303,7 @@ class Table(object):
         #convert to bytes 
         if row_start:
             row_start = row_start.encode()
-        else:
-            row_start = b''
+
         if row_stop:
             row_stop = row_stop.encode()
 
@@ -326,8 +325,8 @@ class Table(object):
             row_start = row_prefix.encode()
             row_stop = str_increment(row_prefix).encode()
 
-        if row_start is None:
-            row_start = b''
+        #if row_start is None:
+        #    row_start = b''
 
         cols = make_columns(columns)
         tt = make_timerange(timerange)
