@@ -1,7 +1,7 @@
 #!/bin/bash -eux
 sudo apt-get update
-sudo apt-get -q install -y wget oracle-java8-installer python-dev 
-sudo update-java-alternatives -s java-8-oracle
+sudo apt-get -q install -y wget openjdk-8-jdk-headless
+#sudo update-java-alternatives -s java-8-oracle
 
 # download and install hbase 2.2.x
 ver='2.2.0'
