@@ -16,4 +16,4 @@ script:
   - tox -e py
 
 after_success:
-  - nosetests & codecov
+  - nosetests && codecov
