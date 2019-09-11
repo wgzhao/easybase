@@ -8,7 +8,7 @@ from numbers import Integral
 from operator import attrgetter
 from struct import Struct
 
-from .hbase.ttypes import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete, TTableName
+from Hbase_thrift import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete, TTableName
 
 from .util import thrift_type_to_dict, str_increment, OrderedDict
 
@@ -64,16 +64,34 @@ def make_columnvalue(data):
 
 def make_row(cell_map, include_timestamp):
     """Make a row dict for a cell mapping like ttypes.TRowResult.columns.
-    [TColumnValue(value='v1', tags=None, qualifier='c1', family='cf1', timestamp=1464971511298),
-    TColumnValue(value='v2', tags=None, qualifier='c2', family='cf1', timestamp=1464971511298),
-    TColumnValue(value='5', tags=None, qualifier='c3', family='cf2', timestamp=1464971511298)]
+    [TColumnValue(family='cf1', qualifier='c1', value='v2', timestamp=456, tags=None, type=4), 
+    TColumnValue(family='cf1', qualifier='c2', value='v3', timestamp=1568097958364, tags=None, type=4), 
+    TColumnValue(family='cf2', qualifier='c1', value='v4', timestamp=1568097958364, tags=None, type=4), 
+    TColumnValue(family='cf2', qualifier='c2', value='v5', timestamp=789, tags=None, type=4)]
+
+    if specify include_timestamp, then the result  of result like below:
+        {'cf1:c1':[('v2',456),],
+         'cf1:c2': [('v3', 1568097958364),],
+         'cf2:c1': [('v4', 1568097958364),],
+         'cf2:c2': [('v5', 789),],
+         }
+    else will return the below:
+        {'cf1:c1':'v2',
+         'cf1:c2': 'v3',
+         'cf2:c1': 'v4',
+         'cf2:c2': 'v5',
+         }
+
     """
-    rs = []
-    tmp_d = dict()
+    rs = {}
     for r in cell_map:
-        tmp_d[r.family.decode() + ':' + r.qualifier.decode()] = r.value.decode()
-        tmp_d['timestamp'] = r.timestamp
-        rs.append(tmp_d)
+        q = r.family + ':' + r.qualifier
+        if include_timestamp:
+            cell = rs.get(q,[])
+            cell.append((r.value, r.timestamp))
+            rs[q] = cell
+        else:
+            rs[q] = r.value
     return rs
     #cellfn = include_timestamp and make_cell_timestamp or make_cell
     #return dict((cn, cellfn(cell)) for cn, cell in cell_map.iteritems())
@@ -113,7 +131,7 @@ class Table(object):
         descriptor = self.connection.client.getTableDescriptor(self.get_tablename())
         
         # convert bytes to string
-        families = {cf.name: self._bytes2str(cf.attributes) for cf in descriptor.columns}
+        families = {cf.name: cf.attributes for cf in descriptor.columns}
 
         return families
 
@@ -285,8 +303,7 @@ class Table(object):
         #convert to bytes 
         if row_start:
             row_start = row_start.encode()
-        else:
-            row_start = b''
+
         if row_stop:
             row_stop = row_stop.encode()
 
@@ -308,8 +325,8 @@ class Table(object):
             row_start = row_prefix.encode()
             row_stop = str_increment(row_prefix).encode()
 
-        if row_start is None:
-            row_start = b''
+        #if row_start is None:
+        #    row_start = b''
 
         cols = make_columns(columns)
         tt = make_timerange(timerange)
@@ -349,7 +366,7 @@ class Table(object):
                 for n_returned, item in enumerate(items, n_returned + 1):
                     row = make_row(item.columnValues, include_timestamp)
 
-                    yield item.row.decode(), row
+                    yield item.row, row
 
                     if limit is not None and n_returned == limit:
                         return  # scan has finished
@@ -517,3 +534,33 @@ class Table(object):
             return obj.decode()
         if isinstance(obj, dict):
             return {x.decode():y.decode() for x,y in iteritems(obj) }
+
+
+    def batch(self, timestamp=None, batch_size=None, transaction=False):
+        """Create a new batch operation for current table
+
+        This method returns a new :py:class:`Batch` instance that can be 
+        used for mass data manipulation. The `timestamp` argument applies 
+        all puts and deletes on the batch
+
+        If given, the `batch_size` argument specifies the maximum batch size
+        after which the batch should send the mutations to the server, By 
+        default this is unbounded.
+
+        The `transaction` argument specifies wether the returned :py:class:`Batch`
+        instance should act in a transaction-like manner when used as context manager
+        in a ``with`` block of code. The `transaction` flag cannot be used in combination
+        with `batch_size`.
+
+        :param int timestamp: timestamp (optional)
+        :param int batch_size: batch size (optional)
+        :param bool transaction: whether this batch should behave like a transaction
+
+        :return: Batch instance
+        :rtype: :py:class:`Batch`
+        """
+        raise NotImplementedError
+        # kwargs = locals().copy()
+
+        # del kwargs['self']
+        # return Batch(table=self, **kwargs)

@@ -7,12 +7,15 @@ EasyBase connection module.
 import logging
 from six import iteritems, binary_type, text_type
 
-from thrift.transport.TSocket import TSocket
-from thrift.transport.TTransport import TBufferedTransport, TFramedTransport
-from thrift.protocol import TBinaryProtocol, TCompactProtocol
+from thriftpy2.transport import TSocket
+from thriftpy2.transport import TBufferedTransport, TFramedTransport
+from thriftpy2.protocol import TBinaryProtocol, TCompactProtocol
+from thriftpy2.thrift import TClient
+from thriftpy2.rpc import make_client
 
-from .hbase.THBaseService import Client
-from .hbase.ttypes import TTableName, TTimeRange, TTransport, TColumnFamilyDescriptor, TTableDescriptor
+
+from Hbase_thrift import TTableName, TTimeRange, TColumnFamilyDescriptor, TTableDescriptor
+from Hbase_thrift import THBaseService as HBase
 
 from .table import Table
 from .util import pep8_to_camel_case
@@ -25,8 +28,8 @@ THRIFT_TRANSPORTS = dict(
     framed=TFramedTransport,
 )
 THRIFT_PROTOCOLS = dict(
-    binary=TBinaryProtocol.TBinaryProtocol,
-    compact=TCompactProtocol.TCompactProtocol,
+    binary=TBinaryProtocol,
+    compact=TCompactProtocol,
 )
 
 DEFAULT_HOST = 'localhost'
@@ -142,20 +145,30 @@ class Connection(object):
         self._protocol_class = THRIFT_PROTOCOLS[protocol]
         self._refresh_thrift_client()
 
-        if autoconnect:
-            self.open()
+        # if autoconnect:
+        #     self.open()
 
         self._initialized = True
 
     def _refresh_thrift_client(self):
-        """Refresh the Thrift socket, transport, and client."""
-        socket = TSocket(self.host, self.port)
-        if self.timeout is not None:
-            socket.setTimeout(self.timeout)
+        #socket = TSocket(host=self.host, port=self.port, socket_timeout=self.timeout)
 
-        self.transport = self._transport_class(socket)
-        protocol = self._protocol_class(self.transport)
-        self.client = Client(protocol)
+        #self.transport = self._transport_class()
+        #protocol = self._protocol_class(self.transport, decode_response=False)
+        """Refresh the Thrift socket, transport, and client."""
+        self.client = make_client(HBase, self.host, port=self.port,
+                    #proto_factory=protocol,
+                    #trans_factory=self.transport,
+                    timeout=self.timeout)
+        #self.client = TClient(HBase, protocol)
+
+        # socket = TSocket(self.host, self.port)
+        # if self.timeout is not None:
+        #     socket.set_timeout(self.timeout)
+
+        # self.transport = self._transport_class(socket)
+        # protocol = self._protocol_class(self.transport)
+        # self.client = TClient(protocol)
 
     def _table_name(self, name):
         """Construct a table name by optionally adding a table name prefix."""
@@ -169,28 +182,29 @@ class Connection(object):
 
         This method opens the underlying Thrift transport (TCP connection).
         """
-        if self.transport.isOpen():
-            return
+        #if self.transport.is_open():
+        #    return
 
         logger.debug("Opening Thrift transport to %s:%d", self.host, self.port)
-        self.transport.open()
+        #self.transport.open()
 
     def close(self):
         """Close the underyling transport to the HBase instance.
 
         This method closes the underlying Thrift transport (TCP connection).
         """
-        if not self.transport.isOpen():
-            return
+        self.client.close()
+        # if not self.transport.is_open():
+        #     return
 
-        if logger is not None:
-            # If called from __del__(), module variables may no longer
-            # exist.
-            logger.debug(
-                "Closing Thrift transport to %s:%d",
-                self.host, self.port)
+        # if logger is not None:
+        #     # If called from __del__(), module variables may no longer
+        #     # exist.
+        #     logger.debug(
+        #         "Closing Thrift transport to %s:%d",
+        #         self.host, self.port)
 
-        self.transport.close()
+        # self.transport.close()
 
     def __del__(self):
         try:
