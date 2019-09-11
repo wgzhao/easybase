@@ -6,15 +6,19 @@ import os
 import random
 import collections
 import threading
+import time 
 
-import six
+
 from six.moves import range
+from six import text_type, iteritems
 
+from thriftpy2.thrift import TDecodeException
 
 from nose.tools import (
     assert_dict_equal,
     assert_equal,
     assert_false,
+    assert_not_in,
     assert_in,
     assert_is_instance,
     assert_is_not_none,
@@ -109,8 +113,8 @@ def test_prefix():
 
 def test_families():
     families = table.families()
-    for name, fdesc in six.iteritems(families):
-        assert_is_instance(name, bytes)
+    for name, fdesc in iteritems(families):
+        assert_is_instance(name, text_type)
         assert_is_instance(fdesc, dict)
         #assert_is_instance(fdesc['BLOCKSIZE'], int)
         assert_in('VERSIONS', fdesc)
@@ -193,12 +197,17 @@ def test_row():
     with assert_raises(TypeError):
         row(rk, 123)
 
+    with assert_raises(TypeError):
+        row(rk, columns='a column string')
+
+    with assert_raises(TypeError):
+        row(rk, timerange=123)
 
     put(rk, {'cf1:c1': 'v1'}, timestamp=123)
     put(rk, {'cf1:c1': 'v2'}, timestamp=456)
     put(rk, {'cf1:c2': 'v3',
             'cf2:c1': 'v4'})
-    put(rk, {'cf2:c2', 'v5'}, timestamp=789)
+    put(rk, {'cf2:c2': 'v5'}, timestamp=789)
 
     rs = {
         'cf1:c1': 'v2',
@@ -206,7 +215,237 @@ def test_row():
         'cf2:c1': 'v4',
         'cf2:c2': 'v5'
     }
-    assert_dict_equal(rs, row(rk))
+
+
+
+    assert_dict_equal(rs, row(rk, include_timestamp=False))
+
+    rs =  {'cf1:c1':[('v2',456),],
+         'cf2:c2': [('v5', 789),],
+         }
+    
+    assert_dict_equal(rs, row(rk, columns=['cf1:c1','cf2:c2'], include_timestamp=True))
+
+    rs = {
+        'cf1:c1': [('v2',456),]
+    }
+    assert_dict_equal(rs, row(rk, timestamp=456, include_timestamp=True))
+    assert_dict_equal({}, row(rk, timestamp=111, include_timestamp=True))
+
+def test_rows():
+    row_keys = ['rk_1', 'rk_2','rk_3']
+    old_value = {'cf1:c1':'v_old_c1', 'cf1:c2':'v_old_c2'}
+    new_value = {'cf1:c1':'v_new_c1', 'cf1:c2':'v_new_c2'}
+
+    # with assert_raises(TypeError):
+    #     table.rows(row_keys, object())
+
+    with assert_raises(TDecodeException):
+        table.rows(row_keys, timestamp='invalid_timestamp')
+
+    for rk in row_keys:
+        table.put(rk, old_value, timestamp=111)
+    
+    for rk in row_keys:
+        table.put(rk, new_value)
+
+    assert_dict_equal({}, table.rows([]))
+
+    rows = dict(table.rows(row_keys))
+
+    for rk in row_keys:
+        assert_in(rk, rows)
+        assert_dict_equal(new_value, rows[rk])
+
+    rows = dict(table.rows(row_keys, timestamp=222))
+    assert_dict_equal({None: {}}, rows)
+
+def calc_rows(scanner):
+    return len(list(scanner))
+
+def test_scan():
+    with assert_raises(TypeError):
+        list(table.scan(row_prefix='foo', row_start='bar'))
+
+    if connection.compat == '0.99':
+        with assert_raises(NotImplementedError):
+            list(table.scan(filter='foo'))
+
+    with assert_raises(ValueError):
+        list(table.scan(limit=0))
+
+    with assert_raises(ValueError):
+        list(table.scan(batch_size=0))
+
+    with assert_raises(ValueError):
+        list(table.scan(scan_batching=0))
+
+    # write mass rows
+    for i in range(1000):
+        table.put(
+            'rk_scan_{:04}'.format(i),
+            {
+                'cf1:c1': 'v1',
+                'cf2:c2': 'v2',
+            }
+        )
+
+
+    scanner = table.scan(row_start='rk_scan_0010', row_stop='rk_scan_0020', columns=['cf1:c1'])
+    assert_equal(10, calc_rows(scanner))
+    
+    scanner = table.scan(row_start='non_exists', row_stop='end_stop')
+    assert_equal(0, calc_rows(scanner))
+
+    scanner = table.scan(row_start='rk_scan_', row_stop='rk_scan_0010', columns=['cf2:c2'])
+
+    rk, row = next(scanner)
+    assert_equal(rk, 'rk_scan_0000')
+    assert_equal(10-1, calc_rows(scanner))
+
+    scanner = table.scan(row_start='rk_scan_', row_stop='rk_scan_0100', columns=['cf2:c2'], limit=10)
+    assert_equal(10, calc_rows(scanner))
+    
+    scanner = table.scan(row_prefix='rk_scan_01', batch_size=10, limit=20)
+    assert_equal(20, calc_rows(scanner))
+
+    scanner = table.scan(limit=20)
+    next(scanner)
+    next(scanner)
+    scanner.close()
+
+    with assert_raises(StopIteration):
+        next(scanner)
+
+@nottest
+def test_scan_reverse():
+    for i in range(1000):
+        table.put(
+            'rk_scan_rev_{:04}'.format(i),
+            {
+                'cf1:c1': 'v1',
+                'cf2:c2': 'v2',
+            }
+        )
+
+    scanner = table.scan(row_prefix='rk_scan_rev_', reversed=True)
+    assert_equal(1000, calc_rows(scanner))
+
+    scanner = table.scan(limit=10, reversed=True)
+    assert_equal(10, calc_rows(scanner))
+
+    scanner = table.scan(row_start='rk_scan_rev_0050', row_stop='rk_scan_rev_0000', reversed=True)
+    
+    k, v = next(scanner)
+    assert_equal('rk_scan_rev_0050', k)
+
+    assert_equal(50-1, calc_rows(scanner))
+
+def test_scan_filter():
+
+    _filter = "SingleColumnValueFilter('cf1','c1', = , 'binary:v1')"
+    for k, v in table.scan(filter=_filter):
+        print(k,v)
+
+def test_delete():
+    rk = 'rk_test_del'
+
+    cols = {
+        'cf1:c1':'v1',
+        'cf1:c2':'v2',
+        'cf2:c1':'v3',
+    }
+
+    table.put(rk, {'cf1:c1':'v1old'}, timestamp=123)
+    table.put(rk, cols)
+
+    table.delete(rk, timestamp=111)
+    assert_dict_equal({'cf1:c1':'v1'}, table.row(rk, columns=['cf1:c1']))
+
+    table.delete(rk, ['cf1:c1'], timestamp=111)
+    assert_equal({}, table.row(rk, columns=['cf1:c1'], maxversions=2))
+
+    rs = table.row(rk)
+    assert_not_in('cf1:c1', rs)
+    assert_in('cf1:c2', rs)
+    assert_in('cf2:c1', rs)
+
+    table.delete(rk)
+    assert_dict_equal({}, table.row(rk))
+
+def test_connection_pool():
+
+    from thriftpy2.thrift import TException
+
+    def run():
+        name = threading.current_thread().name
+        print("Thread %s starting" % name)
+
+        def inner_function():
+            # Nested connection requests must return the same connection
+            with pool.connection() as another_connection:
+                assert connection is another_connection
+
+                # Fake an exception once in a while
+                if random.random() < .25:
+                    print("Introducing random failure")
+                    #connection.transport.close()
+                    raise TException("Fake transport exception")
+
+        for i in range(50):
+            with pool.connection() as connection:
+                connection.table(TEST_TABLE_NAME)
+
+                try:
+                    inner_function()
+                except TException:
+                    # This error should have been picked up by the
+                    # connection pool, and the connection should have
+                    # been replaced by a fresh one
+                    pass
+
+                connection.table(TEST_TABLE_NAME)
+
+        print("Thread %s done" % name)
+
+    N_THREADS = 10
+
+    with assert_raises(TypeError):
+        ConnectionPool(size=[])
+
+    with assert_raises(ValueError):
+        ConnectionPool(size=0)
+
+    pool = ConnectionPool(size=3)
+    threads = [threading.Thread(target=run) for i in range(N_THREADS)]
+
+    for t in threads:
+        t.start()
+
+    while threads:
+        for t in threads:
+            t.join(timeout=.1)
+
+        # filter out finished threads
+        threads = [t for t in threads if t.is_alive()]
+        print("%d threads still alive" % len(threads))
+
+
+def test_pool_exhaustion():
+    pool = ConnectionPool(size=1)
+
+    def run():
+        with assert_raises(NoConnectionsAvailable):
+            with pool.connection(timeout=.1) as connection:
+                connection.table(TEST_TABLE_NAME)
+
+    with pool.connection():
+        # At this point the only connection is assigned to this thread,
+        # so another thread cannot obtain a connection at this point.
+
+        t = threading.Thread(target=run)
+        t.start()
+        t.join()
 
 @nottest
 def test_get():
@@ -214,6 +453,7 @@ def test_get():
     assert_is_instance(rs, list)
     assert_equal(len(rs), 1)
     #assert_equal(rs[0])
+
 
 if __name__ == '__main__':
     import logging

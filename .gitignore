@@ -7,3 +7,5 @@ build
 .vscode
 __pycache__/
 .eggs/
+py3/
+py2/
