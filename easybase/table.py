@@ -408,7 +408,30 @@ class Table(object):
         self.connection.client.put(self.name.encode(), tput)
 
     def puts(self, rows):
-        pass
+        """"Commit a List of Puts to the table
+
+        This method stores the data in sepcified by `row` . the `rows` argument is list that containers multiple `row` . e.g 
+        
+            rows = {
+                'r1': {'data':{'cf1:c1':'v1', 'cf2:c2': 'v2'},
+                       'wal': True, 'timestamp':123},
+                'r2': {'data':{'cf1:c1': 'v2', 'cf2:c2': 'v3'},
+                      }
+            }
+        each `row` is dictionary that the key is row key and the 
+        value maps columns to values . Columns names must include a family and qualifier part.
+
+        
+        :param dict rows: contains multiple number of `row`
+        """
+        tputs = []
+        for rk, item  in iteritems(rows):
+            cols = make_columnvalue(item['data'])
+            tput = TPut(row=rk.encode(), columnValues=cols, 
+                        durability=item.get('wal',True), 
+                        timestamp=item.get('timestamp',None))
+            tputs.append(tput)
+        self.connection.client.putMultiple(self.name.encode(), tputs)
 
     def delete(self, row, columns=None, timestamp=None, deletetype=1, attributes=None, durability=False):
         """Delete data from the table.

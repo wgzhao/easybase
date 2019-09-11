@@ -137,6 +137,21 @@ def test_put():
     table.put('r2', {'cf1:c1': 'v2'}, timestamp=19890604)
     table.put('r3', {'cf1:c1': 'v3'}, timestamp=1568028613)
 
+def test_puts():
+    rows = {}
+    rks = []
+    for i in range(100):
+        rk = 'rk_puts_{}'.format(i)
+        rks.append(rk)
+        rows[rk] = {'data':{'cf1:c1':'v1','cf2:c2':'v2'}}
+        if random.random() > 0.5:
+            rows[rk]['wal'] = True
+            rows[rk]['timestamp'] = random.randint(100,1000)
+    table.puts(rows)  
+    
+    rs = table.rows(rks)
+    assert_equal(100, calc_rows(rs))
+
 @nottest
 def test_compaction():
     connection.compact_table(TEST_TABLE_NAME)

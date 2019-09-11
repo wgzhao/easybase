@@ -15,5 +15,5 @@ test:
 clean:
 	find . -name '*.py[co]' -delete
 
-dist: test
-	python setup.py sdist
+dist:
+	python setup.py bdist_wheel bdist
