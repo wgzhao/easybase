@@ -107,3 +107,8 @@ Scan rows
 
 You can get detail in
 `DemoClient.py <https://github.com/wgzhao/easybase/blob/master/DemoClient.py>`__
+
+
+License
+=================
+MIT License   `<http://www.opensource.org/licenses/MIT>`_. 
