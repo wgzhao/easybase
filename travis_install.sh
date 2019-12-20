@@ -4,7 +4,7 @@ sudo apt-get -q install -y wget openjdk-8-jdk-headless
 #sudo update-java-alternatives -s java-8-oracle
 
 # download and install hbase 2.2.x
-ver='2.2.0'
+ver='2.2.2'
 tarball="hbase-${ver}-bin.tar.gz"
 wget -q -O /tmp/${tarball} https://www-us.apache.org/dist/hbase/${ver}/${tarball}
 
