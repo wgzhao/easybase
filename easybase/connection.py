@@ -14,8 +14,8 @@ from thriftpy2.thrift import TClient
 from thriftpy2.rpc import make_client
 
 
-from Hbase_thrift import TTableName, TTimeRange, TColumnFamilyDescriptor, TTableDescriptor
-from Hbase_thrift import THBaseService as HBase
+from HBase_thrift import TTableName, TTimeRange, TColumnFamilyDescriptor, TTableDescriptor
+from HBase_thrift import THBaseService as HBase
 
 from .table import Table
 from .util import pep8_to_camel_case

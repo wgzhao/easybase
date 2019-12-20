@@ -8,7 +8,7 @@ from numbers import Integral
 from operator import attrgetter
 from struct import Struct
 
-from Hbase_thrift import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete, TTableName
+from HBase_thrift import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete, TTableName
 
 from .util import thrift_type_to_dict, str_increment, OrderedDict
 
