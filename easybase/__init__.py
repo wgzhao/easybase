@@ -7,8 +7,8 @@ from pkg_resources import resource_filename
 import thriftpy2
 
 thriftpy2.load(
-    resource_filename('easybase', 'Hbase.thrift'),
-    module_name='Hbase_thrift'
+    resource_filename('easybase', 'HBase.thrift'),
+    module_name='HBase_thrift'
     )
 
 from ._version import __version__
