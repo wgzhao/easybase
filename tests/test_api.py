@@ -19,7 +19,6 @@ from nose.tools import (
     assert_in,
     assert_is_instance,
     assert_is_not_none,
-    assert_list_equal,
     assert_raises,
     assert_true,
     nottest,
@@ -29,7 +28,7 @@ from easybase import Connection, ConnectionPool, NoConnectionsAvailable
 
 EASYBASE_HOST = os.environ.get('EASYBASE_HOST', '127.0.0.1')
 EASYBASE_PORT = os.environ.get('EASYBASE_PORT', 9090)
-EASYBASE_COMPAT = os.environ.get('EASYBASE_COMPAT', '0.96')
+EASYBASE_COMPAT = os.environ.get('EASYBASE_COMPAT', '0.98')
 EASYBASE_TRANSPORT = os.environ.get('EASYBASE_TRANSPORT', 'buffered')
 
 TABLE_PREFIX = 'easybase_test_tmp'
@@ -392,7 +391,7 @@ def test_delete():
     assert_dict_equal({'cf1:c1': 'v1'}, table.row(rk, columns=['cf1:c1']))
 
     table.delete(rk, ['cf1:c1'], timestamp=111)
-    assert_equal({}, table.row(rk, columns=['cf1:c1'], maxversions=2))
+    assert_equal({}, table.row(rk, columns=['cf1:c1'], max_versions=2))
 
     rs = table.row(rk)
     assert_not_in('cf1:c1', rs)
