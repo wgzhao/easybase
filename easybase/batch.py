@@ -18,6 +18,7 @@ class Batch(object):
 
     def __init__(self, table, timestamp=None, batch_size=None,
                  transaction=False, wal=True):
+        # type: (str, str, int, bool, bool) -> None
         """Initialise a new Batch instance."""
         if not (timestamp is None or isinstance(timestamp, Integral)):
             raise TypeError("'timestamp' must be an integer or None")
@@ -66,6 +67,7 @@ class Batch(object):
     #
 
     def put(self, row, data, wal=None):
+        # type: (str, dict, bool) -> None
         """Store data in the table.
 
         See :py:meth:`Table.put` for a description of the `row`, `data`,
@@ -89,6 +91,7 @@ class Batch(object):
             self.send()
 
     def delete(self, row, columns=None, wal=None):
+        # type: (str, list, bool) -> None
         """Delete data from the table.
 
         See :py:meth:`Table.put` for a description of the `row`, `data`,
