@@ -24,7 +24,8 @@ from nose.tools import (
     nottest,
 )
 
-from easybase import Connection, ConnectionPool, NoConnectionsAvailable
+from easybase.connection import Connection
+from easybase.pool import ConnectionPool, NoConnectionsAvailable
 
 EASYBASE_HOST = os.environ.get('EASYBASE_HOST', '127.0.0.1')
 EASYBASE_PORT = os.environ.get('EASYBASE_PORT', 9090)

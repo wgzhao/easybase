@@ -217,15 +217,6 @@ class Connection(object):
 
         # self.transport.close()
 
-    def __del__(self):
-        try:
-            self._initialized
-        except AttributeError:
-            # Failure from constructor
-            return
-        else:
-            self.close()
-
     def table(self, name, use_prefix=True):
         # type: (str, bool) -> Table
         """Return a table object.
