@@ -168,6 +168,7 @@ class Table(object):
         :param list_or_tuple columns: list of columns (optional)
         :param int timestamp: timestamp (optional)
         :param list_or_tuple timerange: list of timestamp ,ONLY include 2 elements(option)
+        :param int max_versions: number of row's version (optional)
         :param bool include_timestamp: whether timestamps are returned
 
         :return: Mapping of columns (both qualifier and family) to values
@@ -202,6 +203,8 @@ class Table(object):
         :param list rows: list of row keys
         :param list_or_tuple columns: list of columns (optional)
         :param int timestamp: timestamp (optional)
+        :param list_or_tuple timerange: the range of timestamp, ONLY include 2 elements (optional)
+        :param int max_versions: number of row's version (optional)
         :param bool include_timestamp: whether timestamps are returned
 
         :return: List of mappings (columns to values)
@@ -402,7 +405,7 @@ class Table(object):
         :param str row: the row key
         :param dict data: the data to store
         :param int timestamp: timestamp (optional)
-        :param wal bool: whether to write to the WAL (optional)
+        :param bool wal: whether to write to the WAL (optional)
         """
         # if wal is None:
         #    wal = self.wal
@@ -414,8 +417,8 @@ class Table(object):
     def puts(self, rows):
         """"Commit a List of Puts to the table
 
-        This method stores the data in sepcified by `row` . the `rows` argument is list that containers multiple `row` . e.g 
-        
+        This method stores the data in sepcified by `row` . the `rows` argument is list that containers multiple `row` .
+         e.g
             rows = {
                 'r1': {'data':{'cf1:c1':'v1', 'cf2:c2': 'v2'},
                        'wal': True, 'timestamp':123},
@@ -557,7 +560,8 @@ class Table(object):
         """
         return TTableName(ns=None, qualifier=self.name.encode())
 
-    def _bytes2str(self, obj):
+    @staticmethod
+    def _bytes2str(obj):
         if isinstance(obj, bytes):
             return obj.decode()
         if isinstance(obj, dict):

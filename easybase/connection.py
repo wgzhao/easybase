@@ -116,7 +116,7 @@ class Connection(object):
                  table_prefix_separator='_', compat=DEFAULT_COMPAT,
                  transport=DEFAULT_TRANSPORT, protocol=DEFAULT_PROTOCOL,
                  use_kerberos=False, sasl_service_name='hbase'):
-
+        # type: (str, int, int, bool, str, str, str, str, str, bool, str) -> None
         if transport not in THRIFT_TRANSPORTS:
             raise ValueError("'transport' must be one of %s"
                              % ", ".join(THRIFT_TRANSPORTS.keys()))
@@ -151,8 +151,8 @@ class Connection(object):
         self._protocol_class = THRIFT_PROTOCOLS[protocol]
         self._refresh_thrift_client()
 
-        # if autoconnect:
-        #     self.open()
+        if autoconnect:
+            self.open()
 
         self._initialized = True
 
@@ -181,6 +181,7 @@ class Connection(object):
         # self.client = TClient(protocol)
 
     def _table_name(self, name):
+        # type: (str) -> str
         """Construct a table name by optionally adding a table name prefix."""
         if self.table_prefix is None:
             return name
@@ -226,6 +227,7 @@ class Connection(object):
             self.close()
 
     def table(self, name, use_prefix=True):
+        # type: (str, bool) -> Table
         """Return a table object.
 
         Returns a :py:class:`easybase.Table` instance for the table
@@ -274,6 +276,7 @@ class Connection(object):
         # return names
 
     def create_table(self, name, families):
+        # type: (str, dict) -> None
         """Create a table.
 
         :param str name: The table name
@@ -343,6 +346,7 @@ class Connection(object):
             raise NotImplementedError("HBase 1.x not support create_table method")
 
     def delete_table(self, name, disable=False):
+        # type: (str, bool) -> None
         """Delete the specified table.
 
         .. versionadded:: 0.5
@@ -361,6 +365,7 @@ class Connection(object):
         self.client.deleteTable(self.get_tablename(name))
 
     def enable_table(self, name):
+        # type: (str) -> None
         """Enable the specified table.
 
         :param str name: The table name
@@ -369,6 +374,7 @@ class Connection(object):
         self.client.enableTable(self.get_tablename(name))
 
     def disable_table(self, name):
+        # type: (str) -> None
         """Disable the specified table.
 
         :param str name: The table name
@@ -377,6 +383,7 @@ class Connection(object):
         self.client.disableTable(self.get_tablename(name))
 
     def is_table_enabled(self, name):
+        # type: (str) -> bool
         """Return whether the specified table is enabled.
 
         :param str name: The table name
@@ -388,6 +395,7 @@ class Connection(object):
         return self.client.isTableEnabled(self.get_tablename(name))
 
     def compact_table(self, name, major=False):
+        # type: (str, bool) -> None
         """Compact the specified table.
 
         :param str name: The table name
@@ -401,6 +409,7 @@ class Connection(object):
         #     self.client.compact(name)
 
     def exist_table(self, name):
+        # type: (str) -> bool
         """Return whether the sepcified table is exists
         Notes: HBase 1.x not support this method
 
@@ -414,6 +423,7 @@ class Connection(object):
             return False
 
     def get_tablename(self, name):
+        # type: (str) -> TTableName
         """Return the py:class:TTableName class of the spcified table name
 
         :param str name: The table name
