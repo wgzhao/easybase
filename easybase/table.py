@@ -4,13 +4,12 @@ EasyBase table module.
 import time
 import logging
 from six import iteritems
-from numbers import Integral
 from operator import attrgetter
 from struct import Struct
 
 from HBase_thrift import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete, TTableName
 
-from .util import thrift_type_to_dict, str_increment, OrderedDict
+from .util import str_increment, OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ def make_timerange(ts):
         # only one element, take it as  min timestamp
         ts[1] = int(time.time())
 
-    return TTimeRange(minStamp=ts[0],maxStamp=ts[1])
+    return TTimeRange(minStamp=ts[0], maxStamp=ts[1])
 
 
 def make_columns(cols):
@@ -44,7 +43,7 @@ def make_columns(cols):
         return cols
     if not isinstance(cols, (tuple, list)):
         raise TypeError("'columns' must be  list or tuple")
-    columns=[]
+    columns = []
     for c in cols:
         f, q = c.split(':')
         columns.append(TColumn(family=f.encode(), qualifier=q.encode()))
@@ -61,6 +60,7 @@ def make_columnvalue(data):
         f, q = column.split(":")
         cols.append(TColumnValue(family=f.encode(), qualifier=q.encode(), value=value.encode()))
     return cols
+
 
 def make_row(cell_map, include_timestamp):
     """Make a row dict for a cell mapping like ttypes.TRowResult.columns.
@@ -87,14 +87,14 @@ def make_row(cell_map, include_timestamp):
     for r in cell_map:
         q = r.family + ':' + r.qualifier
         if include_timestamp:
-            cell = rs.get(q,[])
+            cell = rs.get(q, [])
             cell.append((r.value, r.timestamp))
             rs[q] = cell
         else:
             rs[q] = r.value
     return rs
-    #cellfn = include_timestamp and make_cell_timestamp or make_cell
-    #return dict((cn, cellfn(cell)) for cn, cell in cell_map.iteritems())
+    # cellfn = include_timestamp and make_cell_timestamp or make_cell
+    # return dict((cn, cellfn(cell)) for cn, cell in cell_map.iteritems())
 
 
 def make_ordered_row(sorted_columns, include_timestamp):
@@ -111,6 +111,7 @@ class Table(object):
     This class cannot be instantiated directly; use :py:meth:`Connection.table`
     instead.
     """
+
     def __init__(self, name, connection):
         self.name = name
         self.connection = connection
@@ -129,7 +130,7 @@ class Table(object):
         :rtype: dict
         """
         descriptor = self.connection.client.getTableDescriptor(self.get_tablename())
-        
+
         # convert bytes to string
         families = {cf.name: cf.attributes for cf in descriptor.columns}
 
@@ -140,12 +141,11 @@ class Table(object):
         names = self.connection.client.getColumnDescriptors(self.name).keys()
         return [name.rstrip(':') for name in names]
 
-
     #
     # Data retrieval
     #
 
-    def row(self, row, columns=None, timestamp=None, timerange=None, maxversions=1, include_timestamp=False):
+    def row(self, row, columns=None, timestamp=None, timerange=None, max_versions=1, include_timestamp=False):
         """Retrieve a single row of data.
 
         This method retrieves the row with the row key specified in the `row`
@@ -175,18 +175,20 @@ class Table(object):
         """
         if columns is not None and not isinstance(columns, (tuple, list)):
             raise TypeError("'columns' must be a tuple or list")
-        if timerange is not None and not isinstance(timerange,(tuple, list)):
+        if timerange is not None and not isinstance(timerange, (tuple, list)):
             raise TypeError("'timerange' must be a tuple or list")
         cols = make_columns(columns)
         tt = make_timerange(timerange)
 
-        tget=TGet(row=row.encode(),columns=cols,timestamp=timestamp,timeRange=tt,maxVersions=maxversions)
-        result = self.connection.client.get(self.name.encode(),tget)
+        tget = TGet(row=row.encode(), columns=cols, timestamp=timestamp, timeRange=tt, maxVersions=max_versions)
+        result = self.connection.client.get(self.name.encode(), tget)
         if not result:
             return {}
+        if max_versions > 1:
+            include_timestamp = True
         return make_row(result.columnValues, include_timestamp)
 
-    def rows(self, rows, columns=None, timestamp=None, timerange=None, maxversions=1,
+    def rows(self, rows, columns=None, timestamp=None, timerange=None, max_versions=1,
              include_timestamp=False):
         """Retrieve multiple rows of data.
 
@@ -209,9 +211,10 @@ class Table(object):
         if not rows:
             # Avoid round-trip if the result is empty anyway
             return {}
-        tgets=[]
+        tgets = []
         for r in rows:
-            tgets.append(TGet(row=r,columns=columns,timestamp=timestamp,timeRange=timerange,maxVersions=maxversions))
+            tgets.append(
+                TGet(row=r, columns=columns, timestamp=timestamp, timeRange=timerange, maxVersions=max_versions))
         results = self.connection.client.getMultiple(self.name, tgets)
 
         return [(r.row, make_row(r.columnValues, include_timestamp))
@@ -220,7 +223,7 @@ class Table(object):
     def scan(self, row_start=None, row_stop=None, row_prefix=None,
              columns=None, filter=None, timerange=None,
              include_timestamp=False, batch_size=1000, scan_batching=None,
-             limit=None, reversed=False, max_version=1):
+             limit=None, reversed=False, max_versions=1):
         """Create a scanner for data in the table.
 
         This method returns an iterable that can be used for looping over the
@@ -295,12 +298,12 @@ class Table(object):
         :param bool scan_batching: server-side scan batching (optional)
         :param int limit: max number of rows to return
         :param bool reversed: whether to reversed
-        :param int max_version: number of row's versions (optional)
+        :param int max_versions: number of row's versions (optional)
 
         :return: generator yielding the rows matching the scan
         :rtype: iterable of `(row_key, row_data)` tuples
         """
-        #convert to bytes 
+        # convert to bytes
         if row_start:
             row_start = row_start.encode()
 
@@ -325,12 +328,13 @@ class Table(object):
             row_start = row_prefix.encode()
             row_stop = str_increment(row_prefix).encode()
 
-        #if row_start is None:
+        # if row_start is None:
         #    row_start = b''
 
         cols = make_columns(columns)
         tt = make_timerange(timerange)
-
+        if max_versions > 1:
+            include_timestamp = True
         tscan = TScan(
             startRow=row_start,
             stopRow=row_stop,
@@ -340,9 +344,9 @@ class Table(object):
             filterString=filter,
             batchSize=scan_batching,
             reversed=reversed,
-            maxVersions=max_version,
+            maxVersions=max_versions,
         )
-        
+
         scan_id = self.connection.client.openScanner(self.name.encode(), tscan)
 
         logger.debug("Opened scanner (id=%d) on '%s'", scan_id, self.name)
@@ -400,7 +404,7 @@ class Table(object):
         :param int timestamp: timestamp (optional)
         :param wal bool: whether to write to the WAL (optional)
         """
-        #if wal is None:
+        # if wal is None:
         #    wal = self.wal
         cols = make_columnvalue(data)
 
@@ -425,11 +429,11 @@ class Table(object):
         :param dict rows: contains multiple number of `row`
         """
         tputs = []
-        for rk, item  in iteritems(rows):
+        for rk, item in iteritems(rows):
             cols = make_columnvalue(item['data'])
-            tput = TPut(row=rk.encode(), columnValues=cols, 
-                        durability=item.get('wal',True), 
-                        timestamp=item.get('timestamp',None))
+            tput = TPut(row=rk.encode(), columnValues=cols,
+                        durability=item.get('wal', True),
+                        timestamp=item.get('timestamp', None))
             tputs.append(tput)
         self.connection.client.putMultiple(self.name.encode(), tputs)
 
@@ -460,7 +464,8 @@ class Table(object):
         :param int durability:
         """
         cols = make_columns(columns)
-        tdelete = TDelete(row=row.encode(), columns=cols, timestamp=timestamp, deleteType=deletetype, attributes=attributes, durability=durability)
+        tdelete = TDelete(row=row.encode(), columns=cols, timestamp=timestamp, deleteType=deletetype,
+                          attributes=attributes, durability=durability)
         self.connection.client.deleteSingle(self.name.encode(), tdelete)
 
     #
@@ -552,12 +557,11 @@ class Table(object):
         """
         return TTableName(ns=None, qualifier=self.name.encode())
 
-    def _bytes2str(self,obj):
+    def _bytes2str(self, obj):
         if isinstance(obj, bytes):
             return obj.decode()
         if isinstance(obj, dict):
-            return {x.decode():y.decode() for x,y in iteritems(obj) }
-
+            return {x.decode(): y.decode() for x, y in iteritems(obj)}
 
     def batch(self, timestamp=None, batch_size=None, transaction=False):
         """Create a new batch operation for current table

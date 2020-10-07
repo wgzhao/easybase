@@ -1,4 +1,3 @@
-
 from collections import defaultdict
 import logging
 from numbers import Integral
@@ -16,6 +15,7 @@ class Batch(object):
     This class cannot be instantiated directly; use :py:meth:`Table.batch`
     instead.
     """
+
     def __init__(self, table, timestamp=None, batch_size=None,
                  transaction=False, wal=True):
         """Initialise a new Batch instance."""

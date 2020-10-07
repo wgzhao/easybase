@@ -4,10 +4,7 @@ EasyBase tests.
 
 import os
 import random
-import collections
 import threading
-import time 
-
 
 from six.moves import range
 from six import text_type, iteritems
@@ -39,17 +36,18 @@ TABLE_PREFIX = 'easybase_test_tmp'
 TEST_TABLE_NAME = 'test1'
 
 connetion_kwargs = dict(zip(
-    ('host','port','table_prefix','compat','transport'),
+    ('host', 'port', 'table_prefix', 'compat', 'transport'),
     (EASYBASE_HOST,
-    EASYBASE_PORT,
-    TABLE_PREFIX,
-    EASYBASE_COMPAT,
-    EASYBASE_TRANSPORT
-    ),
-    ))
+     EASYBASE_PORT,
+     TABLE_PREFIX,
+     EASYBASE_COMPAT,
+     EASYBASE_TRANSPORT
+     ),
+))
 
 connection = None
 table = None
+
 
 def setup_module():
     global connection, table
@@ -62,12 +60,13 @@ def setup_module():
     cfs = {
         'cf1': {},
         'cf2': None,
-        'cf3': {'max_versions':10}
+        'cf3': {'max_versions': 10}
     }
     connection.create_table(TEST_TABLE_NAME, families=cfs)
 
     table = connection.table(TEST_TABLE_NAME)
     assert_is_not_none(table)
+
 
 def attempt_delete_table():
     if connection.exist_table(TEST_TABLE_NAME):
@@ -78,9 +77,11 @@ def attempt_delete_table():
 def test_tablename():
     assert_equal(TABLE_PREFIX + '_' + TEST_TABLE_NAME, table.name)
 
+
 def test_connect_compat():
     with assert_raises(ValueError):
         Connection(compat='a_invalide_version')
+
 
 def test_timeout_arg():
     Connection(
@@ -88,12 +89,14 @@ def test_timeout_arg():
         autoconnect=False
     )
 
+
 def test_enabling():
     assert_true(connection.is_table_enabled(TEST_TABLE_NAME))
     connection.disable_table(TEST_TABLE_NAME)
     assert_false(connection.is_table_enabled(TEST_TABLE_NAME))
     connection.enable_table(TEST_TABLE_NAME)
     assert_true(connection.is_table_enabled(TEST_TABLE_NAME))
+
 
 def test_prefix():
     assert_equal(TABLE_PREFIX + '_', connection._table_name(''))
@@ -111,18 +114,21 @@ def test_prefix():
     with assert_raises(TypeError):
         Connection(autoconnect=False, table_prefix=6.4)
 
+
 def test_families():
     families = table.families()
     for name, fdesc in iteritems(families):
         assert_is_instance(name, text_type)
         assert_is_instance(fdesc, dict)
-        #assert_is_instance(fdesc['BLOCKSIZE'], int)
+        # assert_is_instance(fdesc['BLOCKSIZE'], int)
         assert_in('VERSIONS', fdesc)
+
 
 @nottest
 def test_table_region():
     regions = table.regions()
     assert_is_instance(regions, list)
+
 
 def test_invalid_table_create():
     with assert_raises(ValueError):
@@ -132,10 +138,12 @@ def test_invalid_table_create():
     with assert_raises(TypeError):
         connection.create_table('t3', families=[])
 
+
 def test_put():
-    table.put('r1', {'cf1:c1': 'v1','cf2:c2': 'v2'})
+    table.put('r1', {'cf1:c1': 'v1', 'cf2:c2': 'v2'})
     table.put('r2', {'cf1:c1': 'v2'}, timestamp=19890604)
     table.put('r3', {'cf1:c1': 'v3'}, timestamp=1568028613)
+
 
 def test_puts():
     rows = {}
@@ -143,19 +151,21 @@ def test_puts():
     for i in range(100):
         rk = 'rk_puts_{}'.format(i)
         rks.append(rk)
-        rows[rk] = {'data':{'cf1:c1':'v1','cf2:c2':'v2'}}
+        rows[rk] = {'data': {'cf1:c1': 'v1', 'cf2:c2': 'v2'}}
         if random.random() > 0.5:
             rows[rk]['wal'] = True
-            rows[rk]['timestamp'] = random.randint(100,1000)
-    table.puts(rows)  
-    
+            rows[rk]['timestamp'] = random.randint(100, 1000)
+    table.puts(rows)
+
     rs = table.rows(rks)
     assert_equal(100, calc_rows(rs))
+
 
 @nottest
 def test_compaction():
     connection.compact_table(TEST_TABLE_NAME)
     connection.compact_table(TEST_TABLE_NAME, major=True)
+
 
 @nottest
 def test_atomic_counters():
@@ -179,6 +189,7 @@ def test_atomic_counters():
     assert_equal(5, table.counter_dec(row, column))
     assert_equal(3, table.counter_dec(row, column, 2))
     assert_equal(10, table.counter_dec(row, column, -7))
+
 
 @nottest
 def test_batch():
@@ -204,6 +215,7 @@ def test_batch():
     with assert_raises(TypeError):
         b = table.batch(transaction=True, batch_size=10)
 
+
 def test_row():
     row = table.row
     put = table.put
@@ -221,7 +233,7 @@ def test_row():
     put(rk, {'cf1:c1': 'v1'}, timestamp=123)
     put(rk, {'cf1:c1': 'v2'}, timestamp=456)
     put(rk, {'cf1:c2': 'v3',
-            'cf2:c1': 'v4'})
+             'cf2:c1': 'v4'})
     put(rk, {'cf2:c2': 'v5'}, timestamp=789)
 
     rs = {
@@ -231,26 +243,25 @@ def test_row():
         'cf2:c2': 'v5'
     }
 
-
-
     assert_dict_equal(rs, row(rk, include_timestamp=False))
 
-    rs =  {'cf1:c1':[('v2',456),],
-         'cf2:c2': [('v5', 789),],
-         }
-    
-    assert_dict_equal(rs, row(rk, columns=['cf1:c1','cf2:c2'], include_timestamp=True))
+    rs = {'cf1:c1': [('v2', 456), ],
+          'cf2:c2': [('v5', 789), ],
+          }
+
+    assert_dict_equal(rs, row(rk, columns=['cf1:c1', 'cf2:c2'], include_timestamp=True))
 
     rs = {
-        'cf1:c1': [('v2',456),]
+        'cf1:c1': [('v2', 456), ]
     }
     assert_dict_equal(rs, row(rk, timestamp=456, include_timestamp=True))
     assert_dict_equal({}, row(rk, timestamp=111, include_timestamp=True))
 
+
 def test_rows():
-    row_keys = ['rk_1', 'rk_2','rk_3']
-    old_value = {'cf1:c1':'v_old_c1', 'cf1:c2':'v_old_c2'}
-    new_value = {'cf1:c1':'v_new_c1', 'cf1:c2':'v_new_c2'}
+    row_keys = ['rk_1', 'rk_2', 'rk_3']
+    old_value = {'cf1:c1': 'v_old_c1', 'cf1:c2': 'v_old_c2'}
+    new_value = {'cf1:c1': 'v_new_c1', 'cf1:c2': 'v_new_c2'}
 
     # with assert_raises(TypeError):
     #     table.rows(row_keys, object())
@@ -260,7 +271,7 @@ def test_rows():
 
     for rk in row_keys:
         table.put(rk, old_value, timestamp=111)
-    
+
     for rk in row_keys:
         table.put(rk, new_value)
 
@@ -275,8 +286,10 @@ def test_rows():
     rows = dict(table.rows(row_keys, timestamp=222))
     assert_dict_equal({None: {}}, rows)
 
+
 def calc_rows(scanner):
     return len(list(scanner))
+
 
 def test_scan():
     with assert_raises(TypeError):
@@ -305,10 +318,9 @@ def test_scan():
             }
         )
 
-
     scanner = table.scan(row_start='rk_scan_0010', row_stop='rk_scan_0020', columns=['cf1:c1'])
     assert_equal(10, calc_rows(scanner))
-    
+
     scanner = table.scan(row_start='non_exists', row_stop='end_stop')
     assert_equal(0, calc_rows(scanner))
 
@@ -316,11 +328,11 @@ def test_scan():
 
     rk, row = next(scanner)
     assert_equal(rk, 'rk_scan_0000')
-    assert_equal(10-1, calc_rows(scanner))
+    assert_equal(10 - 1, calc_rows(scanner))
 
     scanner = table.scan(row_start='rk_scan_', row_stop='rk_scan_0100', columns=['cf2:c2'], limit=10)
     assert_equal(10, calc_rows(scanner))
-    
+
     scanner = table.scan(row_prefix='rk_scan_01', batch_size=10, limit=20)
     assert_equal(20, calc_rows(scanner))
 
@@ -331,6 +343,7 @@ def test_scan():
 
     with assert_raises(StopIteration):
         next(scanner)
+
 
 @nottest
 def test_scan_reverse():
@@ -350,32 +363,33 @@ def test_scan_reverse():
     assert_equal(10, calc_rows(scanner))
 
     scanner = table.scan(row_start='rk_scan_rev_0050', row_stop='rk_scan_rev_0000', reversed=True)
-    
+
     k, v = next(scanner)
     assert_equal('rk_scan_rev_0050', k)
 
-    assert_equal(50-1, calc_rows(scanner))
+    assert_equal(50 - 1, calc_rows(scanner))
+
 
 def test_scan_filter():
-
     _filter = "SingleColumnValueFilter('cf1','c1', = , 'binary:v1')"
     for k, v in table.scan(filter=_filter):
-        print(k,v)
+        print(k, v)
+
 
 def test_delete():
     rk = 'rk_test_del'
 
     cols = {
-        'cf1:c1':'v1',
-        'cf1:c2':'v2',
-        'cf2:c1':'v3',
+        'cf1:c1': 'v1',
+        'cf1:c2': 'v2',
+        'cf2:c1': 'v3',
     }
 
-    table.put(rk, {'cf1:c1':'v1old'}, timestamp=123)
+    table.put(rk, {'cf1:c1': 'v1old'}, timestamp=123)
     table.put(rk, cols)
 
     table.delete(rk, timestamp=111)
-    assert_dict_equal({'cf1:c1':'v1'}, table.row(rk, columns=['cf1:c1']))
+    assert_dict_equal({'cf1:c1': 'v1'}, table.row(rk, columns=['cf1:c1']))
 
     table.delete(rk, ['cf1:c1'], timestamp=111)
     assert_equal({}, table.row(rk, columns=['cf1:c1'], maxversions=2))
@@ -388,8 +402,8 @@ def test_delete():
     table.delete(rk)
     assert_dict_equal({}, table.row(rk))
 
-def test_connection_pool():
 
+def test_connection_pool():
     from thriftpy2.thrift import TException
 
     def run():
@@ -404,7 +418,7 @@ def test_connection_pool():
                 # Fake an exception once in a while
                 if random.random() < .25:
                     print("Introducing random failure")
-                    #connection.transport.close()
+                    # connection.transport.close()
                     raise TException("Fake transport exception")
 
         for i in range(50):
@@ -462,12 +476,13 @@ def test_pool_exhaustion():
         t.start()
         t.join()
 
+
 @nottest
 def test_get():
     rs = table.row('r1')
     assert_is_instance(rs, list)
     assert_equal(len(rs), 1)
-    #assert_equal(rs[0])
+    # assert_equal(rs[0])
 
 
 if __name__ == '__main__':
@@ -480,11 +495,11 @@ if __name__ == '__main__':
         pass
     else:
         import signal
+
         faulthandler.register(signal.SIGUSR1)
-    
+
     logging.basicConfig(level=logging.DEBUG)
 
     method_name = 'test_{}'.format(sys.argv[1])
     method = globals()[method_name]
     method()
-    

@@ -4,7 +4,7 @@ EasyBase connection pool module.
 
 import contextlib
 import logging
-from six.moves import queue, range, xrange
+from six.moves import queue, xrange
 import socket
 import threading
 
@@ -13,6 +13,7 @@ from thriftpy2.thrift import TException
 from .connection import Connection
 
 logger = logging.getLogger(__name__)
+
 
 #
 # TODO: maybe support multiple Thrift servers. What would a reasonable
@@ -50,6 +51,7 @@ class ConnectionPool(object):
     :param kwargs: keyword arguments passed to
                    :py:class:`easybase.Connection`
     """
+
     def __init__(self, size, **kwargs):
         if not isinstance(size, int):
             raise TypeError("Pool 'size' arg must be an integer")

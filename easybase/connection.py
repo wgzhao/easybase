@@ -6,17 +6,16 @@ EasyBase connection module.
 
 import logging
 from six import iteritems, binary_type, text_type
+from thriftpy2.thrift import TApplicationException
 
-from thriftpy2.transport import TSocket
 from thriftpy2.transport import TBufferedTransport, TFramedTransport
 from thriftpy2.protocol import TBinaryProtocol, TCompactProtocol
-from thriftpy2.thrift import TClient
 from thriftpy2.rpc import make_client
-
 
 from HBase_thrift import TTableName, TTimeRange, TColumnFamilyDescriptor, TTableDescriptor
 from HBase_thrift import THBaseService as HBase
 
+from .kerberos import TSaslClientTransport
 from .table import Table
 from .util import pep8_to_camel_case
 
@@ -39,6 +38,7 @@ DEFAULT_COMPAT = '0.96'
 DEFAULT_PROTOCOL = 'binary'
 
 STRING_OR_BINARY = (binary_type, text_type)
+
 
 class Connection(object):
     """Connection to an HBase Thrift server.
@@ -107,11 +107,15 @@ class Connection(object):
     :param str table_prefix_separator: Separator used for `table_prefix`
     :param str compat: Compatibility mode (optional)
     :param str transport: Thrift transport mode (optional)
+    :param bool use_kerberos: Whether enable kerberos support or not (optional)
+    :param str sasl_service_name: The HBase's kerberos service name, defaults to 'hbase' (optional)
     """
+
     def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, timeout=None,
                  autoconnect=True, table_prefix=None,
                  table_prefix_separator='_', compat=DEFAULT_COMPAT,
-                 transport=DEFAULT_TRANSPORT, protocol=DEFAULT_PROTOCOL):
+                 transport=DEFAULT_TRANSPORT, protocol=DEFAULT_PROTOCOL,
+                 use_kerberos=False, sasl_service_name='hbase'):
 
         if transport not in THRIFT_TRANSPORTS:
             raise ValueError("'transport' must be one of %s"
@@ -140,6 +144,8 @@ class Connection(object):
         self.table_prefix = table_prefix
         self.table_prefix_separator = table_prefix_separator
         self.compat = compat
+        self.use_kerberos = use_kerberos
+        self.sasl_service_name = sasl_service_name
 
         self._transport_class = THRIFT_TRANSPORTS[transport]
         self._protocol_class = THRIFT_PROTOCOLS[protocol]
@@ -151,16 +157,20 @@ class Connection(object):
         self._initialized = True
 
     def _refresh_thrift_client(self):
-        #socket = TSocket(host=self.host, port=self.port, socket_timeout=self.timeout)
+        # socket = TSocket(host=self.host, port=self.port, socket_timeout=self.timeout)
 
-        #self.transport = self._transport_class()
-        #protocol = self._protocol_class(self.transport, decode_response=False)
+        # self.transport = self._transport_class()
+        # protocol = self._protocol_class(self.transport, decode_response=False)
         """Refresh the Thrift socket, transport, and client."""
-        self.client = make_client(HBase, self.host, port=self.port,
-                    #proto_factory=protocol,
-                    #trans_factory=self.transport,
-                    timeout=self.timeout)
-        #self.client = TClient(HBase, protocol)
+        if self.use_kerberos:
+            transport = TSaslClientTransport(self._transport_class, self.host, self.sasl_service_name)
+            self.client = make_client(HBase, self.host, port=self.port,
+                                      # proto_factory=protocol,
+                                      trans_factory=transport,
+                                      timeout=self.timeout)
+        else:
+            self.client = make_client(HBase, self.host, port=self.port, timeout=self.timeout)
+        # self.client = TClient(HBase, protocol)
 
         # socket = TSocket(self.host, self.port)
         # if self.timeout is not None:
@@ -182,11 +192,11 @@ class Connection(object):
 
         This method opens the underlying Thrift transport (TCP connection).
         """
-        #if self.transport.is_open():
+        # if self.transport.is_open():
         #    return
 
         logger.debug("Opening Thrift transport to %s:%d", self.host, self.port)
-        #self.transport.open()
+        # self.transport.open()
 
     def close(self):
         """Close the underyling transport to the HBase instance.
@@ -305,12 +315,12 @@ class Connection(object):
                 "Cannot create table %r (no column families specified)"
                 % name)
 
-        #table_descriptors = [{'tableName': name.encode()}]
+        # table_descriptors = [{'tableName': name.encode()}]
         family_desc = []
         for cf_name, options in iteritems(families):
             if options is None:
                 options = dict()
-            
+
             kwargs = dict()
             for option_name, value in iteritems(options):
                 if isinstance(value, STRING_OR_BINARY):
@@ -321,13 +331,16 @@ class Connection(object):
             # if not cf_name.endswith(':'):
             #     cf_name += ':'
             # kwargs['name'] = cf_name.encode()
-            #table_descriptors.append(TTableDescriptor(**kwargs))
+            # table_descriptors.append(TTableDescriptor(**kwargs))
             cf = TColumnFamilyDescriptor(name=cf_name.encode(), **kwargs)
             family_desc.append(cf)
 
         tbl_name = TTableName(ns=None, qualifier=name.encode())
-        tdesc = TTableDescriptor(tableName=tbl_name, columns = family_desc)
-        self.client.createTable(tdesc, splitKeys=None)
+        tdesc = TTableDescriptor(tableName=tbl_name, columns=family_desc)
+        try:
+            self.client.createTable(tdesc, splitKeys=None)
+        except TApplicationException as e:
+            raise NotImplementedError("HBase 1.x not support create_table method")
 
     def delete_table(self, name, disable=False):
         """Delete the specified table.
@@ -352,7 +365,7 @@ class Connection(object):
 
         :param str name: The table name
         """
-        #name = self._table_name(name)
+        # name = self._table_name(name)
         self.client.enableTable(self.get_tablename(name))
 
     def disable_table(self, name):
@@ -360,7 +373,7 @@ class Connection(object):
 
         :param str name: The table name
         """
-        #name = self._table_name(name).encode()
+        # name = self._table_name(name).encode()
         self.client.disableTable(self.get_tablename(name))
 
     def is_table_enabled(self, name):
@@ -371,7 +384,7 @@ class Connection(object):
         :return: whether the table is enabled
         :rtype: bool
         """
-        #name = self._table_name(name).encode()
+        # name = self._table_name(name).encode()
         return self.client.isTableEnabled(self.get_tablename(name))
 
     def compact_table(self, name, major=False):
@@ -386,15 +399,19 @@ class Connection(object):
         #     self.client.majorCompact(name)
         # else:
         #     self.client.compact(name)
-    
+
     def exist_table(self, name):
         """Return whether the sepcified table is exists
+        Notes: HBase 1.x not support this method
 
         :param str name: The table name
         :return whether the table is exists
         :rtype: bool
         """
-        return self.client.tableExists(self.get_tablename(name))
+        try:
+            return self.client.tableExists(self.get_tablename(name))
+        except TApplicationException as e:
+            return False
 
     def get_tablename(self, name):
         """Return the py:class:TTableName class of the spcified table name
