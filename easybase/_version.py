@@ -5,4 +5,4 @@ This module defines the package version for use in __init__.py and
 setup.py.
 """
 
-__version__ = '1.0.3'
+__version__ = '1.0.4'
