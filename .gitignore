@@ -10,3 +10,4 @@ __pycache__/
 py3/
 py2/
 .tox/
+.idea
