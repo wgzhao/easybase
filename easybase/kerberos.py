@@ -2,7 +2,11 @@ from io import BytesIO
 from struct import pack, unpack
 
 import six
-from thriftpy2.transport import TTransportBase, TTransportException, readall
+from thriftpy2.transport import TTransportBase, TTransportException
+try:
+    from thriftpy2.transport import readall
+except ImportError:
+    from thriftpy2.transport.base import readall
 from puresasl.client import SASLClient
 
 
