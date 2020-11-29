@@ -16,7 +16,7 @@ clean:
 	find . -name '*.py[co]' -delete
 	$$(rm -rf dist)
 dist:
-	python setup.py bdist_wheel bdist
+	python setup.py bdist_wheel sdist
 
 upload:
 	python -m twine upload dist/*
