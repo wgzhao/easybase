@@ -103,9 +103,10 @@ Scan rows
      print(row)
 
 Get all namespace
---------------
+------------------
 
 .. code:: python
+
    for ns in conn.list_namespaces():
         print(ns)
 
