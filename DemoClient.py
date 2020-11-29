@@ -5,14 +5,20 @@ import easybase
 
 host = os.getenv('HBASE_HOST', 'localhost')
 port = int(os.getenv('HBASE_PORT', 9090))
+compat = os.getenv('COMPAT', '2.2.0')
 # table_name must be exists in hbase 
 table_name = os.getenv('HBASE_TABLE', 'easybase_test')
 
 try:
-    conn = easybase.Connection(host, port=port, timeout=2000, use_kerberos=True)
+    conn = easybase.Connection(host, port=port, timeout=2000, use_kerberos=False)
 except ConnectionRefusedError as e:
     raise SystemError("failed to connection {}:{}, {}".format(host, port, e))
 
+print('list all table in current namespace')
+print(conn.tables())
+
+print('list all tables in default namespace')
+print(conn.get_tables_by_namespace('default'))
 
 if conn.exist_table(table_name):
     # drop table first
@@ -22,6 +28,9 @@ if conn.exist_table(table_name):
 # create table 
 print("create table {}".format(table_name))
 conn.create_table(table_name, {'cf1': dict(), 'cf2': {'max_versions': 2000}})
+
+print("create table {} in namespace: {}".format(table_name, 'eb_ns'))
+conn.create_table(table_name, {'cf1': dict()}, ns_name='eb_ns')
 
 tbl = conn.table(table_name)
 
@@ -112,6 +121,30 @@ for row in rs:
 
 print("should be retrieved 2 records, actually get {} records".format(cnt))
 
+print("test namespace operator")
+ns_name = 'eb_ns'
+print('create namespace: {}'.format(ns_name))
+conn.create_namespace(ns_name)
+print('get namespace: {}'.format(ns_name))
+res = conn.get_namespace(ns_name)
+print(res)
+print('delete namespace: {}'.format(ns_name))
+conn.delete_namespace(ns_name, cascade=True)
+
+print('list all namespaces')
+print(conn.list_namespaces())
+
+print('search table with regex')
+print('create table tbl1,tbl2...tbl10')
+for i in range(1, 11):
+    tbl = 'tbl{}'.format(i)
+    if not conn.exist_table(tbl):
+        conn.create_table(tbl, {'cf1': dict()})
+
+print('search table which starts with tbl')
+tbls = conn.search_table('tbl.*', include_systable=False)
+print(tbls)
+
 conn.close()
 
 print("test connection pool")
@@ -138,3 +171,5 @@ with pool.connection() as connect:
     rs = tbl.scan(row_start='r1', row_stop='r3')
     for row in rs:
         print(row)
+
+    connect.delete_table(table_name, disable=True)

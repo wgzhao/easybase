@@ -1,11 +1,8 @@
 EasyBase
 ========
 
-.. image:: https://travis-ci.com/wgzhao/easybase.svg?branch=master
-    :target: https://travis-ci.com/wgzhao/easybase
-
-.. image:: https://img.shields.io/codecov/c/github/wgzhao/easybase.svg
-    :target: https://codecov.io/gh/wgzhao/easybase
+.. image:: https://github.com/wgzhao/easybase/workflows/Test/badge.svg
+    :target: https://github.com/wgzhao/easybase
 
 .. image:: https://img.shields.io/pypi/dm/easybase.svg
     :target: https://pypi.org/project/easybase/
@@ -21,7 +18,7 @@ EasyBase
 
 
 **EasyBase** is a developer-friendly Python library to interact with
-`Apache HBase <https://hbase.apache.org>`__ . The orignal source code
+`Apache HBase <https://hbase.apache.org>`__ . The original source code
 forked from `HappyBase <https://github.com/wbolster/happybase>`__.
 
 
@@ -30,7 +27,7 @@ Feature highlight
 
 -  easy using
 
--  support HBase Thrift 2 protocol
+-  support HBase Thrift 2 protocol(HBase Thrift 1 is NO longer supported)
 
 -  using `thriftpy2 <http://github.com/thriftpy/thriftpy2>`__ instead of
    old thriftpy
@@ -104,6 +101,13 @@ Scan rows
    scanner = tbl.scan(row_start='rk_0001', row_stop='rk_0100')
    for row in scanner:
      print(row)
+
+Get all namespace
+--------------
+
+.. code:: python
+   for ns in conn.list_namespaces():
+        print(ns)
 
 You can get detail in
 `DemoClient.py <https://github.com/wgzhao/easybase/blob/master/DemoClient.py>`__

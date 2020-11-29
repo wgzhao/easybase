@@ -6,14 +6,16 @@ EasyBase connection module.
 
 import logging
 from six import iteritems, binary_type, text_type
+
 from thriftpy2.thrift import TApplicationException
 
 from thriftpy2.transport import TBufferedTransport, TFramedTransport
 from thriftpy2.protocol import TBinaryProtocol, TCompactProtocol
 from thriftpy2.rpc import make_client
 
-from HBase_thrift import TTableName, TTimeRange, TColumnFamilyDescriptor, TTableDescriptor
+from HBase_thrift import TTableName, TTimeRange, TColumnFamilyDescriptor, TTableDescriptor, TNamespaceDescriptor
 from HBase_thrift import THBaseService as HBase
+from HBase_thrift import TIOError
 
 from .kerberos import TSaslClientTransport
 from .table import Table
@@ -170,15 +172,6 @@ class Connection(object):
                                       timeout=self.timeout)
         else:
             self.client = make_client(HBase, self.host, port=self.port, timeout=self.timeout)
-        # self.client = TClient(HBase, protocol)
-
-        # socket = TSocket(self.host, self.port)
-        # if self.timeout is not None:
-        #     socket.set_timeout(self.timeout)
-
-        # self.transport = self._transport_class(socket)
-        # protocol = self._protocol_class(self.transport)
-        # self.client = TClient(protocol)
 
     def _table_name(self, name):
         # type: (str) -> str
@@ -255,23 +248,24 @@ class Connection(object):
         :return: The table names
         :rtype: List of strings
         """
-        raise NotImplementedError("not implemented yet")
-        # names = self.client.getTableNames()
+        if self.table_prefix is not None:
+            tbl_pattern = self.table_prefix + '.*'
+        else:
+            tbl_pattern = '.*'
+        names = self.search_table(tbl_pattern, include_systable=False)
+        if names:
+            offset = len(self.table_prefix) if self.table_prefix else 0
+            names = [n[offset:] for n in names]
 
-        # # Filter using prefix, and strip prefix from names
-        # if self.table_prefix is not None:
-        #     prefix = self._table_name('')
-        #     offset = len(prefix)
-        #     names = [n[offset:] for n in names if n.startswith(prefix)]
+        return names
 
-        # return names
-
-    def create_table(self, name, families):
-        # type: (str, dict) -> None
+    def create_table(self, name, families, ns_name=None):
+        # type: (str, dict, str) -> None
         """Create a table.
 
         :param str name: The table name
         :param dict families: The name and options for each column family
+        :param str ns_name: the name of namespace, defaults to None
 
         The `families` argument is a dictionary mapping column family
         names to a dictionary containing the options for this column
@@ -328,16 +322,24 @@ class Connection(object):
             # table_descriptors.append(TTableDescriptor(**kwargs))
             cf = TColumnFamilyDescriptor(name=cf_name.encode(), **kwargs)
             family_desc.append(cf)
+        if ns_name and not self.get_namespace(ns_name):
+            try:
+                self.create_namespace(ns_name)
+            except TIOError:
+                print("Failed to create namespace: {}".format(ns_name))
+                return
 
-        tbl_name = TTableName(ns=None, qualifier=name.encode())
+        tbl_name = TTableName(ns=ns_name, qualifier=name.encode())
         tdesc = TTableDescriptor(tableName=tbl_name, columns=family_desc)
         try:
             self.client.createTable(tdesc, splitKeys=None)
-        except TApplicationException as e:
-            raise NotImplementedError("HBase 1.x not support create_table method")
+        except TApplicationException:
+            raise NotImplementedError("current thrift not support create_table method")
+        except TIOError as e:
+            print(e.message)
 
-    def delete_table(self, name, disable=False):
-        # type: (str, bool) -> None
+    def delete_table(self, name, disable=False, ns_name=None):
+        # type: (str, bool, str) -> None
         """Delete the specified table.
 
         .. versionadded:: 0.5
@@ -349,41 +351,45 @@ class Connection(object):
 
         :param str name: The table name
         :param bool disable: Whether to first disable the table if needed
+        :param str ns_name: the namespace name, defaults to none
         """
         if disable and self.is_table_enabled(name):
-            self.disable_table(name)
+            self.disable_table(name, ns_name)
 
-        self.client.deleteTable(self.get_tablename(name))
+        self.client.deleteTable(self.get_tablename(name, ns_name))
 
-    def enable_table(self, name):
-        # type: (str) -> None
+    def enable_table(self, name, ns_name=None):
+        # type: (str, str) -> None
         """Enable the specified table.
 
         :param str name: The table name
+        :param str ns_name: The tablespace name
         """
         # name = self._table_name(name)
-        self.client.enableTable(self.get_tablename(name))
+        self.client.enableTable(self.get_tablename(name, ns_name))
 
-    def disable_table(self, name):
-        # type: (str) -> None
+    def disable_table(self, name, ns_name=None):
+        # type: (str, str) -> None
         """Disable the specified table.
 
         :param str name: The table name
+        :param str ns_name: The namespace name
         """
         # name = self._table_name(name).encode()
-        self.client.disableTable(self.get_tablename(name))
+        self.client.disableTable(self.get_tablename(name, ns_name))
 
-    def is_table_enabled(self, name):
-        # type: (str) -> bool
+    def is_table_enabled(self, name, ns_name=None):
+        # type: (str, str) -> bool
         """Return whether the specified table is enabled.
 
         :param str name: The table name
+        :param str ns_name: The tablespace name
 
         :return: whether the table is enabled
         :rtype: bool
         """
         # name = self._table_name(name).encode()
-        return self.client.isTableEnabled(self.get_tablename(name))
+        return self.client.isTableEnabled(self.get_tablename(name, ns_name))
 
     def compact_table(self, name, major=False):
         # type: (str, bool) -> None
@@ -399,26 +405,123 @@ class Connection(object):
         # else:
         #     self.client.compact(name)
 
-    def exist_table(self, name):
-        # type: (str) -> bool
+    def exist_table(self, name, ns_name=None):
+        # type: (str, str) -> bool
         """Return whether the sepcified table is exists
         Notes: HBase 1.x not support this method
 
         :param str name: The table name
+        :param str ns_name: The tablespace name
         :return whether the table is exists
         :rtype: bool
         """
         try:
-            return self.client.tableExists(self.get_tablename(name))
-        except TApplicationException as e:
+            return self.client.tableExists(self.get_tablename(name, ns_name))
+        except TIOError as e:
             return False
 
-    def get_tablename(self, name):
-        # type: (str) -> TTableName
+    def search_table(self, pattern, include_systable: False):
+        # type (str, bool) -> List[String]
+        """Return table names of tables that match the given pattern
+
+        :param str pattern:  The regular expression to match against
+        :param bool include_systable: set to false if match only against userspace tables
+        :return the table names of the matching table
+        """
+        try:
+            result = self.client.getTableNamesByPattern(pattern, include_systable)
+            return [x.qualifier for x in result]
+        except TIOError:
+            return []
+
+    def get_tables_by_namespace(self, ns_name):
+        # type(str) -> List[Str]
+        """Return names of tables in the given namespace
+
+        :param str ns_name: the namespace's name
+        :return the table names in the namespace
+        """
+        try:
+            if self.get_namespace(ns_name):
+                result = self.client.getTableNamesByNamespace(ns_name)
+                return [x.qualifier for x in result]
+        except TIOError as e:
+            print(e)
+            return []
+
+    def get_tablename(self, name, ns_name=None):
+        # type: (str, str) -> TTableName
         """Return the py:class:TTableName class of the spcified table name
 
         :param str name: The table name
+        :param str ns_name: the namespace's name
         :return the py:class:TTableName Class
         :rtype: class
         """
-        return TTableName(ns=None, qualifier=self._table_name(name).encode())
+        return TTableName(ns=ns_name, qualifier=self._table_name(name).encode())
+
+    def create_namespace(self, ns_name):
+        # type: (str) -> None
+        """Create namespace with ns_name
+
+        :param str ns_name: the name of namespace
+        """
+        tns = TNamespaceDescriptor(ns_name, {})
+        try:
+            if not self.get_namespace(ns_name):
+                self.client.createNamespace(tns)
+        except TIOError as e:
+            print(e)
+
+    def get_namespace(self, ns_name):
+        # type: (str) -> TNamespaceDescriptor
+        """Return the py:class:TNamespaceDescriptor class of the specified namepspace name
+
+        :param str ns_name: the namespace name
+        :return the py:class:TNamespaceDescriptor Class
+        :rtype: class
+        """
+        try:
+            result = self.client.getNamespaceDescriptor(ns_name)
+            return result
+        except TIOError:
+            return None
+
+    def delete_namespace(self, ns_name, cascade=False):
+        # type: (str, bool) -> None
+        """Delete specified namespace
+
+        :param str ns_name: the namespace name
+        :param bool cascade: get ride of namespace with all tables in it
+        :return None
+        """
+        try:
+            if self.get_namespace(ns_name):
+                # exists table ?
+                tbls = self.get_tables_by_namespace(ns_name)
+                if tbls:
+                    if not cascade:
+                        print("namespace {} has {} tables, you cannot drop it without cascade=True option".format(
+                                ns_name, len(tbls)
+                        ))
+                        return
+                    else:
+                        # drop tables
+                        for tbl in tbls:
+                            self.delete_table(tbl, disable=True, ns_name=ns_name)
+                self.client.deleteNamespace(ns_name)
+        except TIOError as e:
+            print(e.message)
+
+    def list_namespaces(self):
+        """Return a list of namespaces names available in this HBase instance
+
+        :return: The namespace names
+        :rtype: List of strings
+        """
+        try:
+            result = self.client.listNamespaceDescriptors()
+            return [x.name for x in result]
+        except TIOError as e:
+            print(e)
+            return []
