@@ -421,9 +421,9 @@ def test_connection_pool():
                     # connection.transport.close()
                     raise TException("Fake transport exception")
 
-        for i in range(50):
-            with pool.connection() as connection:
-                connection.table(TEST_TABLE_NAME)
+        for _ in range(50):
+            with pool.connection() as conn:
+                conn.table(TEST_TABLE_NAME)
 
                 try:
                     inner_function()
@@ -433,7 +433,7 @@ def test_connection_pool():
                     # been replaced by a fresh one
                     pass
 
-                connection.table(TEST_TABLE_NAME)
+                conn.table(TEST_TABLE_NAME)
 
         print("Thread %s done" % name)
 
