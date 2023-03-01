@@ -216,10 +216,18 @@ class Table(object):
         if not rows:
             # Avoid round-trip if the result is empty anyway
             return {}
+
+        if columns is not None and not isinstance(columns, (tuple, list)):
+            raise TypeError("'columns' must be a tuple or list")
+        if timerange is not None and not isinstance(timerange, (tuple, list)):
+            raise TypeError("'timerange' must be a tuple or list")
+        cols = make_columns(columns)
+        tt = make_timerange(timerange)
+
         tgets = []
         for r in rows:
             tgets.append(
-                TGet(row=r, columns=columns, timestamp=timestamp, timeRange=timerange, maxVersions=max_versions))
+                TGet(row=r, columns=cols, timestamp=timestamp, timeRange=tt, maxVersions=max_versions))
         results = self.connection.client.getMultiple(self.name, tgets)
 
         return [(r.row, make_row(r.columnValues, include_timestamp))
