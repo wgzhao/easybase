@@ -227,7 +227,7 @@ class Table(object):
         tgets = []
         for r in rows:
             tgets.append(
-                TGet(row=r, columns=cols, timestamp=timestamp, timeRange=tt, maxVersions=max_versions))
+                TGet(row=r.encode(), columns=cols, timestamp=timestamp, timeRange=tt, maxVersions=max_versions))
         results = self.connection.client.getMultiple(self.name, tgets)
 
         return [(r.row, make_row(r.columnValues, include_timestamp))
