@@ -45,8 +45,10 @@ def make_columns(cols):
         raise TypeError("'columns' must be  list or tuple")
     columns = []
     for c in cols:
-        f, q = c.split(':')
-        columns.append(TColumn(family=f.encode(), qualifier=q.encode()))
+        c = c.split(':')
+        f, q = (c[0].encode(), c[1].encode()) if len(c) == 2 else (c[0].encode(), None)
+        columns.append(TColumn(family=f, qualifier=q))
+
     return columns
 
 
@@ -58,7 +60,7 @@ def make_columnvalue(data):
     cols = []
     for column, value in iteritems(data):
         f, q = column.split(":")
-        cols.append(TColumnValue(family=f.encode(), qualifier=q.encode(), value=value.encode()))
+        cols.append(TColumnValue(family=f.encode(), qualifier=q.encode(), value=value))
     return cols
 
 
@@ -85,7 +87,7 @@ def make_row(cell_map, include_timestamp):
     """
     rs = {}
     for r in cell_map:
-        q = r.family + ':' + r.qualifier
+        q = f"{r.family.decode()}:{r.qualifier.decode()}"
         if include_timestamp:
             cell = rs.get(q, [])
             cell.append((r.value, r.timestamp))
