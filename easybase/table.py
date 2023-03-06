@@ -87,7 +87,7 @@ def make_row(cell_map, include_timestamp):
     """
     rs = {}
     for r in cell_map:
-        q = f"{r.family.decode()}:{r.qualifier.decode()}"
+        q = r.family.decode() + ":" + r.qualifier.decode()
         if include_timestamp:
             cell = rs.get(q, [])
             cell.append((r.value, r.timestamp))
