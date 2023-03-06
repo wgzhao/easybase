@@ -420,7 +420,7 @@ class Connection(object):
         except TIOError as e:
             return False
 
-    def search_table(self, pattern, include_systable: False):
+    def search_table(self, pattern, include_systable):
         # type (str, bool) -> List[String]
         """Return table names of tables that match the given pattern
 
