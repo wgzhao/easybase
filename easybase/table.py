@@ -3,7 +3,7 @@ EasyBase table module.
 """
 import time
 import logging
-from six import iteritems, u
+from six import iteritems
 from operator import attrgetter
 from struct import Struct
 
@@ -46,7 +46,8 @@ def make_columns(cols):
     columns = []
     for c in cols:
         c = c.split(':')
-        f, q = (c[0].encode(), c[1].encode()) if len(c) == 2 else (c[0].encode(), None)
+        f, q = (c[0].encode(), c[1].encode()) if len(
+            c) == 2 else (c[0].encode(), None)
         columns.append(TColumn(family=f, qualifier=q))
 
     return columns
@@ -60,15 +61,16 @@ def make_columnvalue(data):
     cols = []
     for column, value in iteritems(data):
         f, q = column.split(":")
-        cols.append(TColumnValue(family=f.encode(), qualifier=q.encode(), value=value))
+        cols.append(TColumnValue(family=f.encode(),
+                    qualifier=q.encode(), value=value))
     return cols
 
 
 def make_row(cell_map, include_timestamp):
     """Make a row dict for a cell mapping like ttypes.TRowResult.columns.
-    [TColumnValue(family='cf1', qualifier='c1', value='v2', timestamp=456, tags=None, type=4), 
-    TColumnValue(family='cf1', qualifier='c2', value='v3', timestamp=1568097958364, tags=None, type=4), 
-    TColumnValue(family='cf2', qualifier='c1', value='v4', timestamp=1568097958364, tags=None, type=4), 
+    [TColumnValue(family='cf1', qualifier='c1', value='v2', timestamp=456, tags=None, type=4),
+    TColumnValue(family='cf1', qualifier='c2', value='v3', timestamp=1568097958364, tags=None, type=4),
+    TColumnValue(family='cf2', qualifier='c1', value='v4', timestamp=1568097958364, tags=None, type=4),
     TColumnValue(family='cf2', qualifier='c2', value='v5', timestamp=789, tags=None, type=4)]
 
     if specify include_timestamp, then the result  of result like below:
@@ -131,12 +133,14 @@ class Table(object):
         :return: Mapping from column family name to settings dict
         :rtype: dict
         """
-        descriptor = self.connection.client.getTableDescriptor(self.get_tablename())
+        descriptor = self.connection.client.getTableDescriptor(
+            self.get_tablename())
 
         # convert bytes to string
         families = {}
-        for cf in  descriptor.columns:
-            families[cf.name.decode()] = {k.decode(): v.decode() for k, v in iteritems(cf.attributes)}
+        for cf in descriptor.columns:
+            families[cf.name.decode()] = {k.decode(): v.decode()
+                                          for k, v in iteritems(cf.attributes)}
         # families = {cf.name.decode(): cf.attributes for cf in descriptor.columns}
 
         return families
@@ -186,7 +190,8 @@ class Table(object):
         cols = make_columns(columns)
         tt = make_timerange(timerange)
 
-        tget = TGet(row=row.encode(), columns=cols, timestamp=timestamp, timeRange=tt, maxVersions=max_versions)
+        tget = TGet(row=row.encode(), columns=cols,
+                    timestamp=timestamp, timeRange=tt, maxVersions=max_versions)
         result = self.connection.client.get(self.name.encode(), tget)
         if not result:
             return {}
@@ -286,7 +291,7 @@ class Table(object):
         will be stored in `OrderedDict` instances.
 
         The optional `max_version` argument specifies how many versions should be
-        retrieved per row  
+        retrieved per row
 
         **Compatibility notes:**
 
@@ -424,7 +429,8 @@ class Table(object):
         #    wal = self.wal
         cols = make_columnvalue(data)
 
-        tput = TPut(row=row.encode(), columnValues=cols, durability=wal, timestamp=timestamp)
+        tput = TPut(row=row.encode(), columnValues=cols,
+                    durability=wal, timestamp=timestamp)
         self.connection.client.put(self.name, tput)
 
     def puts(self, rows):
@@ -438,10 +444,10 @@ class Table(object):
                 'r2': {'data':{'cf1:c1': 'v2', 'cf2:c2': 'v3'},
                       }
             }
-        each `row` is dictionary that the key is row key and the 
+        each `row` is dictionary that the key is row key and the
         value maps columns to values . Columns names must include a family and qualifier part.
 
-        
+
         :param dict rows: contains multiple number of `row`
         """
         tputs = []
@@ -583,12 +589,12 @@ class Table(object):
     def batch(self, timestamp=None, batch_size=None, transaction=False):
         """Create a new batch operation for current table
 
-        This method returns a new :py:class:`Batch` instance that can be 
-        used for mass data manipulation. The `timestamp` argument applies 
+        This method returns a new :py:class:`Batch` instance that can be
+        used for mass data manipulation. The `timestamp` argument applies
         all puts and deletes on the batch
 
         If given, the `batch_size` argument specifies the maximum batch size
-        after which the batch should send the mutations to the server, By 
+        after which the batch should send the mutations to the server, By
         default this is unbounded.
 
         The `transaction` argument specifies wether the returned :py:class:`Batch`

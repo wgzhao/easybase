@@ -6,12 +6,13 @@ import easybase
 host = os.getenv('HBASE_HOST', 'localhost')
 port = int(os.getenv('HBASE_PORT', 9090))
 compat = os.getenv('COMPAT', '2.2.0')
-# table_name must be exists in hbase 
+# table_name must be exists in hbase
 table_name = os.getenv('HBASE_TABLE', 'easybase_test')
 
 try:
-    conn = easybase.Connection(host, port=port, timeout=2000, use_kerberos=False)
-except ConnectionRefusedError as e:
+    conn = easybase.Connection(
+        host, port=port, timeout=2000, use_kerberos=False)
+except Exception as e:
     raise SystemError("failed to connection {}:{}, {}".format(host, port, e))
 
 print('list all table in current namespace')
@@ -25,7 +26,7 @@ if conn.exist_table(table_name):
     print("drop table {}".format(table_name))
     conn.delete_table(table_name, disable=True)
 
-# create table 
+# create table
 print("create table {}".format(table_name))
 conn.create_table(table_name, {'cf1': dict(), 'cf2': {'max_versions': 2000}})
 
@@ -67,7 +68,8 @@ print(tbl.row('r1', columns=['cf1:c1'], timestamp=ts))
 
 # get with time range
 print("get row id = r1 and time range between %d and %d" % (ts, ts2))
-result = tbl.row('r1', columns=['cf1:c1'], timerange=[ts - 30, ts2], max_versions=vs)
+result = tbl.row('r1', columns=['cf1:c1'], timerange=[
+                 ts - 30, ts2], max_versions=vs)
 print("get {} records".format(len(result)))
 print(result)
 
@@ -111,7 +113,8 @@ print(rs)
 
 # version-based scan
 print("scan with versions")
-rs = tbl.scan(row_start='r10', row_stop='r10', columns=['cf2:c3'], max_versions=10)
+rs = tbl.scan(row_start='r10', row_stop='r10',
+              columns=['cf2:c3'], max_versions=10)
 
 cnt = 0
 for row in rs:
