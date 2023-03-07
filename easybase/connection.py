@@ -13,7 +13,7 @@ from thriftpy2.transport import TBufferedTransport, TFramedTransport
 from thriftpy2.protocol import TBinaryProtocol, TCompactProtocol
 from thriftpy2.rpc import make_client
 
-from HBase_thrift import TTableName, TTimeRange, TColumnFamilyDescriptor, TTableDescriptor, TNamespaceDescriptor
+from HBase_thrift import TTableName, TColumnFamilyDescriptor, TTableDescriptor, TNamespaceDescriptor
 from HBase_thrift import THBaseService as HBase
 from HBase_thrift import TIOError
 
@@ -165,13 +165,15 @@ class Connection(object):
         # protocol = self._protocol_class(self.transport, decode_response=False)
         """Refresh the Thrift socket, transport, and client."""
         if self.use_kerberos:
-            transport = TSaslClientTransport(self._transport_class, self.host, self.sasl_service_name)
+            transport = TSaslClientTransport(
+                self._transport_class, self.host, self.sasl_service_name)
             self.client = make_client(HBase, self.host, port=self.port,
                                       # proto_factory=protocol,
                                       trans_factory=transport,
                                       timeout=self.timeout)
         else:
-            self.client = make_client(HBase, self.host, port=self.port, timeout=self.timeout)
+            self.client = make_client(
+                HBase, self.host, port=self.port, timeout=self.timeout)
 
     def _table_name(self, name):
         # type: (str) -> str
@@ -334,7 +336,8 @@ class Connection(object):
         try:
             self.client.createTable(tdesc, splitKeys=None)
         except TApplicationException:
-            raise NotImplementedError("current thrift not support create_table method")
+            raise NotImplementedError(
+                "current thrift not support create_table method")
         except TIOError as e:
             print(e.message)
 
@@ -417,7 +420,7 @@ class Connection(object):
         """
         try:
             return self.client.tableExists(self.get_tablename(name, ns_name))
-        except TIOError as e:
+        except TIOError:
             return False
 
     def search_table(self, pattern, include_systable):
@@ -429,7 +432,8 @@ class Connection(object):
         :return the table names of the matching table
         """
         try:
-            result = self.client.getTableNamesByPattern(pattern, include_systable)
+            result = self.client.getTableNamesByPattern(
+                pattern, include_systable)
             return [x.qualifier for x in result]
         except TIOError:
             return []
@@ -502,13 +506,14 @@ class Connection(object):
                 if tbls:
                     if not cascade:
                         print("namespace {} has {} tables, you cannot drop it without cascade=True option".format(
-                                ns_name, len(tbls)
+                            ns_name, len(tbls)
                         ))
                         return
                     else:
                         # drop tables
                         for tbl in tbls:
-                            self.delete_table(tbl, disable=True, ns_name=ns_name)
+                            self.delete_table(
+                                tbl, disable=True, ns_name=ns_name)
                 self.client.deleteNamespace(ns_name)
         except TIOError as e:
             print(e.message)
