@@ -1,7 +1,7 @@
 EasyBase
 ========
 
-.. image:: https://github.com/wgzhao/easybase/workflows/Test/badge.svg
+.. image:: https://github.com/wgzhao/easybase/actions/workflows/python-package.yml/badge.svg
     :target: https://github.com/wgzhao/easybase
 
 .. image:: https://img.shields.io/pypi/dm/easybase.svg
