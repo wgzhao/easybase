@@ -6,7 +6,7 @@ sudo apt-get -q install -y wget openjdk-8-jdk-headless
 # download and install hbase 2.2.x
 ver='2.2.5'
 tarball="hbase-${ver}-bin.tar.gz"
-wget -q -O /tmp/${tarball} https://www-us.apache.org/dist/hbase/${ver}/${tarball}
+wget -q -O /tmp/${tarball} https://archive.apache.org/dist/hbase/${ver}/${tarball}
 
 tar -xzf /tmp/${tarball} -C /var/tmp/
 
