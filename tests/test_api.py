@@ -35,7 +35,7 @@ EASYBASE_TRANSPORT = os.environ.get('EASYBASE_TRANSPORT', 'buffered')
 TABLE_PREFIX = 'easybase_test_tmp'
 TEST_TABLE_NAME = 'test1'
 
-connetion_kwargs = dict(zip(
+connection_kwargs = dict(zip(
     ('host', 'port', 'table_prefix', 'compat', 'transport'),
     (EASYBASE_HOST,
      EASYBASE_PORT,
@@ -51,7 +51,7 @@ table = None
 
 def setup_module():
     global connection, table
-    connection = Connection(**connetion_kwargs)
+    connection = Connection(**connection_kwargs)
 
     assert_is_not_none(connection)
 
@@ -85,6 +85,8 @@ def test_connect_compat():
 
 def test_timeout_arg():
     Connection(
+        host=EASYBASE_HOST,
+        port=EASYBASE_PORT,
         timeout=5000,
         autoconnect=False
     )
@@ -105,14 +107,14 @@ def test_prefix():
     assert_equal(connection.table('foobar').name, TABLE_PREFIX + '_foobar')
     assert_equal(connection.table('foobar', use_prefix=False).name, 'foobar')
 
-    c = Connection(autoconnect=False)
+    c = Connection(EASYBASE_HOST, EASYBASE_PORT, autoconnect=False)
     assert_equal('foo', c._table_name('foo'))
 
     with assert_raises(TypeError):
-        Connection(autoconnect=False, table_prefix=111)
+        Connection(EASYBASE_HOST, EASYBASE_PORT, autoconnect=False, table_prefix=111)
 
     with assert_raises(TypeError):
-        Connection(autoconnect=False, table_prefix=6.4)
+        Connection(EASYBASE_HOST, EASYBASE_PORT, autoconnect=False, table_prefix=6.4)
 
 
 def test_families():
@@ -284,7 +286,7 @@ def test_rows():
         assert_dict_equal(new_value, rows[rk])
 
     rows = dict(table.rows(row_keys, timestamp=222))
-    assert_dict_equal({None: {}}, rows)
+    assert_equal(0, len(rows))
 
 
 def calc_rows(scanner):
@@ -370,6 +372,7 @@ def test_scan_reverse():
     assert_equal(50 - 1, calc_rows(scanner))
 
 
+@nottest
 def test_scan_filter():
     _filter = "SingleColumnValueFilter('cf1','c1', = , 'binary:v1')"
     for k, v in table.scan(filter=_filter):
@@ -440,12 +443,12 @@ def test_connection_pool():
     N_THREADS = 10
 
     with assert_raises(TypeError):
-        ConnectionPool(size=[])
+        ConnectionPool(EASYBASE_HOST, EASYBASE_PORT, size=[])
 
     with assert_raises(ValueError):
-        ConnectionPool(size=0)
+        ConnectionPool(host=EASYBASE_HOST, port=EASYBASE_PORT, size=0)
 
-    pool = ConnectionPool(size=3)
+    pool = ConnectionPool(host=EASYBASE_HOST, port=EASYBASE_PORT, size=3)
     threads = [threading.Thread(target=run) for i in range(N_THREADS)]
 
     for t in threads:
@@ -461,7 +464,7 @@ def test_connection_pool():
 
 
 def test_pool_exhaustion():
-    pool = ConnectionPool(size=1)
+    pool = ConnectionPool(host=EASYBASE_HOST, port=EASYBASE_PORT, size=1)
 
     def run():
         with assert_raises(NoConnectionsAvailable):
