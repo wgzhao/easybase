@@ -3,7 +3,7 @@ EasyBase table module.
 """
 import time
 import logging
-from six import iteritems
+from six import iteritems, u
 from operator import attrgetter
 from struct import Struct
 
@@ -90,10 +90,10 @@ def make_row(cell_map, include_timestamp):
         q = r.family.decode() + ":" + r.qualifier.decode()
         if include_timestamp:
             cell = rs.get(q, [])
-            cell.append((r.value, r.timestamp))
+            cell.append((r.value.decode(), r.timestamp))
             rs[q] = cell
         else:
-            rs[q] = r.value
+            rs[q] = r.value.decode()
     return rs
     # cellfn = include_timestamp and make_cell_timestamp or make_cell
     # return dict((cn, cellfn(cell)) for cn, cell in cell_map.iteritems())
@@ -134,7 +134,10 @@ class Table(object):
         descriptor = self.connection.client.getTableDescriptor(self.get_tablename())
 
         # convert bytes to string
-        families = {cf.name: cf.attributes for cf in descriptor.columns}
+        families = {}
+        for cf in  descriptor.columns:
+            families[cf.name.decode()] = {k.decode(): v.decode() for k, v in iteritems(cf.attributes)}
+        # families = {cf.name.decode(): cf.attributes for cf in descriptor.columns}
 
         return families
 
@@ -230,8 +233,8 @@ class Table(object):
                 TGet(row=r.encode(), columns=cols, timestamp=timestamp, timeRange=tt, maxVersions=max_versions))
         results = self.connection.client.getMultiple(self.name, tgets)
 
-        return [(r.row, make_row(r.columnValues, include_timestamp))
-                for r in results]
+        return [(r.row.decode(), make_row(r.columnValues, include_timestamp))
+                for r in results if r.row]
 
     def scan(self, row_start=None, row_stop=None, row_prefix=None,
              columns=None, filter=None, timerange=None,
@@ -383,7 +386,7 @@ class Table(object):
                 for n_returned, item in enumerate(items, n_returned + 1):
                     row = make_row(item.columnValues, include_timestamp)
 
-                    yield item.row, row
+                    yield item.row.decode(), row
 
                     if limit is not None and n_returned == limit:
                         return  # scan has finished
@@ -422,7 +425,7 @@ class Table(object):
         cols = make_columnvalue(data)
 
         tput = TPut(row=row.encode(), columnValues=cols, durability=wal, timestamp=timestamp)
-        self.connection.client.put(self.name.encode(), tput)
+        self.connection.client.put(self.name, tput)
 
     def puts(self, rows):
         """"Commit a List of Puts to the table
