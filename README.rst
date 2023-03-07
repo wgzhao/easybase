@@ -53,7 +53,7 @@ Connect
    import easybase
    host, port = 'localhost', 9000
    tbl = 'test1'
-   conn = easybase.connect(host=host, port=port)
+   conn = easybase.Connection(host=host, port=port)
    table = conn.table(tbl)
    rs = conn.scan(limit=10)
    for row in rs:
