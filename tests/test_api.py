@@ -46,11 +46,11 @@ connection_kwargs = dict(zip(
 ))
 
 connection = None
-table = None
+tbl = None
 
 
 def setup_module():
-    global connection, table
+    global connection, tbl
     connection = Connection(**connection_kwargs)
 
     assert_is_not_none(connection)
@@ -64,8 +64,8 @@ def setup_module():
     }
     connection.create_table(TEST_TABLE_NAME, families=cfs)
 
-    table = connection.table(TEST_TABLE_NAME)
-    assert_is_not_none(table)
+    tbl = connection.table(TEST_TABLE_NAME)
+    assert_is_not_none(tbl)
 
 
 def attempt_delete_table():
@@ -75,7 +75,7 @@ def attempt_delete_table():
 
 
 def test_tablename():
-    assert_equal(TABLE_PREFIX + '_' + TEST_TABLE_NAME, table.name)
+    assert_equal(TABLE_PREFIX + '_' + TEST_TABLE_NAME, tbl.name)
 
 
 def test_connect_compat():
@@ -118,7 +118,7 @@ def test_prefix():
 
 
 def test_families():
-    families = table.families()
+    families = tbl.families()
     for name, fdesc in iteritems(families):
         assert_is_instance(name, text_type)
         assert_is_instance(fdesc, dict)
@@ -128,7 +128,7 @@ def test_families():
 
 @nottest
 def test_table_region():
-    regions = table.regions()
+    regions = tbl.regions()
     assert_is_instance(regions, list)
 
 
@@ -142,9 +142,21 @@ def test_invalid_table_create():
 
 
 def test_put():
-    table.put('r1', {'cf1:c1': 'v1', 'cf2:c2': 'v2'})
-    table.put('r2', {'cf1:c1': 'v2'}, timestamp=19890604)
-    table.put('r3', {'cf1:c1': 'v3'}, timestamp=1568028613)
+    tbl.put('r1', {'cf1:c1': 'v1', 'cf2:c2': 'v2'})
+    tbl.put('r2', {'cf1:c1': 'v2'}, timestamp=19890604)
+    tbl.put('r3', {'cf1:c1': 'v3'}, timestamp=1568028613)
+
+    assert_equal({'cf1:c1': 'v1', 'cf2:c2': 'v2'}, tbl.row('r1'))
+    r = tbl.row('r2', include_timestamp=False)
+    with assert_raises(IndexError):
+        assert_raises(r['cf1:c1'][0][1])
+    r = tbl.row('r2', include_timestamp=True)
+    assert_equal(19890604, r['cf1:c1'][0][1])
+
+    # cleanup
+    tbl.delete('r1')
+    tbl.delete('r2')
+    tbl.delete('r3')
 
 
 def test_puts():
@@ -157,70 +169,25 @@ def test_puts():
         if random.random() > 0.5:
             rows[rk]['wal'] = True
             rows[rk]['timestamp'] = random.randint(100, 1000)
-    table.puts(rows)
+    tbl.puts(rows)
 
-    rs = table.rows(rks)
+    rs = tbl.rows(rks)
     assert_equal(100, calc_rows(rs))
 
+    # cleanup
+    for i in range(100):
+        tbl.delete('rk_puts_{}'.format(i))
 
-@nottest
+
 def test_compaction():
-    connection.compact_table(TEST_TABLE_NAME)
-    connection.compact_table(TEST_TABLE_NAME, major=True)
-
-
-@nottest
-def test_atomic_counters():
-    row = b'r-with-counter'
-    column = 'cf1:cnt'
-
-    assert_equal(0, table.counter_get(row, column))
-
-    assert_equal(10, table.counter_inc(row, column, 10))
-    assert_equal(10, table.counter_get(row, column))
-
-    table.counter_set(row, column, 0)
-    assert_equal(1, table.counter_inc(row, column))
-    assert_equal(4, table.counter_inc(row, column, 3))
-    assert_equal(4, table.counter_get(row, column))
-
-    table.counter_set(row, column, 3)
-    assert_equal(3, table.counter_get(row, column))
-    assert_equal(8, table.counter_inc(row, column, 5))
-    assert_equal(6, table.counter_inc(row, column, -2))
-    assert_equal(5, table.counter_dec(row, column))
-    assert_equal(3, table.counter_dec(row, column, 2))
-    assert_equal(10, table.counter_dec(row, column, -7))
-
-
-@nottest
-def test_batch():
-    with assert_raises(TypeError):
-        table.batch(timestamp='incorrect')
-    b = table.batch()
-    b.put(b'row1', {b'cf1:col1': b'value1',
-                    b'cf1:col2': b'value2'})
-    b.put(b'row2', {b'cf1:col1': b'value1',
-                    b'cf1:col2': b'value2',
-                    b'cf1:col3': b'value3'})
-    b.delete(b'row1', [b'cf1:col4'])
-    b.delete(b'another-row')
-    b.send()
-
-    b = table.batch(timestamp=1234567)
-    b.put(b'r1', {b'cf1:col5': b'value5'})
-    b.send()
-
-    with assert_raises(ValueError):
-        b = table.batch(batch_size=0)
-
-    with assert_raises(TypeError):
-        b = table.batch(transaction=True, batch_size=10)
+    with assert_raises(NotImplementedError):
+        connection.compact_table(TEST_TABLE_NAME)
+        connection.compact_table(TEST_TABLE_NAME, major=True)
 
 
 def test_row():
-    row = table.row
-    put = table.put
+    row = tbl.row
+    put = tbl.put
     rk = 'rk-test'
 
     with assert_raises(TypeError):
@@ -259,6 +226,9 @@ def test_row():
     assert_dict_equal(rs, row(rk, timestamp=456, include_timestamp=True))
     assert_dict_equal({}, row(rk, timestamp=111, include_timestamp=True))
 
+    # cleanup
+    tbl.delete(rk)
+
 
 def test_rows():
     row_keys = ['rk_1', 'rk_2', 'rk_3']
@@ -266,53 +236,60 @@ def test_rows():
     new_value = {'cf1:c1': 'v_new_c1', 'cf1:c2': 'v_new_c2'}
 
     # with assert_raises(TypeError):
-    #     table.rows(row_keys, object())
+    #     tbl.rows(row_keys, object())
 
     with assert_raises(TDecodeException):
-        table.rows(row_keys, timestamp='invalid_timestamp')
+        tbl.rows(row_keys, timestamp='invalid_timestamp')
 
     for rk in row_keys:
-        table.put(rk, old_value, timestamp=111)
+        tbl.put(rk, old_value, timestamp=111)
 
     for rk in row_keys:
-        table.put(rk, new_value)
+        tbl.put(rk, new_value)
 
-    assert_dict_equal({}, table.rows([]))
+    assert_dict_equal({}, tbl.rows([]))
 
-    rows = dict(table.rows(row_keys))
+    rows = dict(tbl.rows(row_keys))
 
     for rk in row_keys:
         assert_in(rk, rows)
         assert_dict_equal(new_value, rows[rk])
 
-    rows = dict(table.rows(row_keys, timestamp=222))
+    rows = dict(tbl.rows(row_keys, timestamp=222))
     assert_equal(0, len(rows))
+
+    # cleanup
+    for rk in row_keys:
+        tbl.delete(rk)
 
 
 def calc_rows(scanner):
-    return len(list(scanner))
+    idx = 0
+    for _ in scanner:
+        idx += 1
+    return idx
 
 
 def test_scan():
     with assert_raises(TypeError):
-        list(table.scan(row_prefix='foo', row_start='bar'))
+        list(tbl.scan(row_prefix='foo', row_start='bar'))
 
     if connection.compat == '0.99':
         with assert_raises(NotImplementedError):
-            list(table.scan(filter='foo'))
+            list(tbl.scan(filter='foo'))
 
     with assert_raises(ValueError):
-        list(table.scan(limit=0))
+        list(tbl.scan(limit=0))
 
     with assert_raises(ValueError):
-        list(table.scan(batch_size=0))
+        list(tbl.scan(batch_size=0))
 
     with assert_raises(ValueError):
-        list(table.scan(scan_batching=0))
+        list(tbl.scan(scan_batching=0))
 
     # write mass rows
     for i in range(1000):
-        table.put(
+        tbl.put(
             'rk_scan_{:04}'.format(i),
             {
                 'cf1:c1': 'v1',
@@ -320,25 +297,25 @@ def test_scan():
             }
         )
 
-    scanner = table.scan(row_start='rk_scan_0010', row_stop='rk_scan_0020', columns=['cf1:c1'])
+    scanner = tbl.scan(row_start='rk_scan_0010', row_stop='rk_scan_0020', columns=['cf1:c1'])
     assert_equal(10, calc_rows(scanner))
 
-    scanner = table.scan(row_start='non_exists', row_stop='end_stop')
+    scanner = tbl.scan(row_start='non_exists', row_stop='end_stop')
     assert_equal(0, calc_rows(scanner))
 
-    scanner = table.scan(row_start='rk_scan_', row_stop='rk_scan_0010', columns=['cf2:c2'])
+    scanner = tbl.scan(row_start='rk_scan_', row_stop='rk_scan_0010', columns=['cf2:c2'])
 
     rk, row = next(scanner)
     assert_equal(rk, 'rk_scan_0000')
     assert_equal(10 - 1, calc_rows(scanner))
 
-    scanner = table.scan(row_start='rk_scan_', row_stop='rk_scan_0100', columns=['cf2:c2'], limit=10)
+    scanner = tbl.scan(row_start='rk_scan_', row_stop='rk_scan_0100', columns=['cf2:c2'], limit=10)
     assert_equal(10, calc_rows(scanner))
 
-    scanner = table.scan(row_prefix='rk_scan_01', batch_size=10, limit=20)
+    scanner = tbl.scan(row_prefix='rk_scan_01', batch_size=10, limit=20)
     assert_equal(20, calc_rows(scanner))
 
-    scanner = table.scan(limit=20)
+    scanner = tbl.scan(limit=20)
     next(scanner)
     next(scanner)
     scanner.close()
@@ -346,11 +323,14 @@ def test_scan():
     with assert_raises(StopIteration):
         next(scanner)
 
+    # cleanup
+    for i in range(1000):
+        tbl.delete('rk_scan_{:04}'.format(i))
 
-@nottest
+
 def test_scan_reverse():
     for i in range(1000):
-        table.put(
+        tbl.put(
             'rk_scan_rev_{:04}'.format(i),
             {
                 'cf1:c1': 'v1',
@@ -358,25 +338,40 @@ def test_scan_reverse():
             }
         )
 
-    scanner = table.scan(row_prefix='rk_scan_rev_', reversed=True)
+    scanner = tbl.scan(row_start='rk_scan_rev_0999', reversed=True)
     assert_equal(1000, calc_rows(scanner))
 
-    scanner = table.scan(limit=10, reversed=True)
+    scanner = tbl.scan(limit=10, reversed=True)
     assert_equal(10, calc_rows(scanner))
 
-    scanner = table.scan(row_start='rk_scan_rev_0050', row_stop='rk_scan_rev_0000', reversed=True)
+    scanner = tbl.scan(row_start='rk_scan_rev_0050', row_stop='rk_scan_rev_0000', reversed=True)
 
-    k, v = next(scanner)
+    k, _ = next(scanner)
     assert_equal('rk_scan_rev_0050', k)
 
     assert_equal(50 - 1, calc_rows(scanner))
 
+    # cleanup
+    for i in range(1000):
+        tbl.delete('rk_scan_rev_{:04}'.format(i))
 
-@nottest
+
 def test_scan_filter():
-    _filter = "SingleColumnValueFilter('cf1','c1', = , 'binary:v1')"
-    for k, v in table.scan(filter=_filter):
-        print(k, v)
+    for i in range(10):
+        tbl.put(
+            'rk_filter_row_{:02}'.format(i),
+            {
+                'cf1:c1': 'filter_v1',
+                'cf2:v2': 'v2'
+            }
+        )
+    _filter = "SingleColumnValueFilter('cf1','c1', = , 'binary:filter_v1')"
+    scanner = tbl.scan(filter=_filter)
+    assert_equal(10, calc_rows(scanner))
+
+    # cleanup
+    for i in range(10):
+        tbl.delete('rk_filter_row_{:02}'.format(i))
 
 
 def test_delete():
@@ -388,22 +383,22 @@ def test_delete():
         'cf2:c1': 'v3',
     }
 
-    table.put(rk, {'cf1:c1': 'v1old'}, timestamp=123)
-    table.put(rk, cols)
+    tbl.put(rk, {'cf1:c1': 'v1old'}, timestamp=123)
+    tbl.put(rk, cols)
 
-    table.delete(rk, timestamp=111)
-    assert_dict_equal({'cf1:c1': 'v1'}, table.row(rk, columns=['cf1:c1']))
+    tbl.delete(rk, timestamp=111)
+    assert_dict_equal({'cf1:c1': 'v1'}, tbl.row(rk, columns=['cf1:c1']))
 
-    table.delete(rk, ['cf1:c1'], timestamp=111)
-    assert_equal({}, table.row(rk, columns=['cf1:c1'], max_versions=2))
+    tbl.delete(rk, ['cf1:c1'], timestamp=111)
+    assert_equal({}, tbl.row(rk, columns=['cf1:c1'], max_versions=2))
 
-    rs = table.row(rk)
+    rs = tbl.row(rk)
     assert_not_in('cf1:c1', rs)
     assert_in('cf1:c2', rs)
     assert_in('cf2:c1', rs)
 
-    table.delete(rk)
-    assert_dict_equal({}, table.row(rk))
+    tbl.delete(rk)
+    assert_dict_equal({}, tbl.row(rk))
 
 
 def test_connection_pool():
@@ -480,14 +475,6 @@ def test_pool_exhaustion():
         t.join()
 
 
-@nottest
-def test_get():
-    rs = table.row('r1')
-    assert_is_instance(rs, list)
-    assert_equal(len(rs), 1)
-    # assert_equal(rs[0])
-
-
 if __name__ == '__main__':
     import logging
     import sys
@@ -502,7 +489,7 @@ if __name__ == '__main__':
         faulthandler.register(signal.SIGUSR1)
 
     logging.basicConfig(level=logging.DEBUG)
-
+    setup_module()
     method_name = 'test_{}'.format(sys.argv[1])
     method = globals()[method_name]
     method()
