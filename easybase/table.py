@@ -351,7 +351,7 @@ class Table(object):
 
         # if row_start is None:
         #    row_start = b''
-
+        logger.debug("start_row = {}, stop_row = {}".format(row_start, row_stop))
         cols = make_columns(columns)
         tt = make_timerange(timerange)
         if max_versions > 1:
