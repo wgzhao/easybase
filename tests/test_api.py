@@ -111,10 +111,10 @@ def test_prefix():
     assert_equal('foo', c._table_name('foo'))
 
     with assert_raises(TypeError):
-        Connection(EASYBASE_HOST, EASYBASE_PORT, autoconnect=False, table_prefix=111)
+        Connection(EASYBASE_HOST, EASYBASE_PORT, compat="0.98", autoconnect=False, table_prefix=111)
 
     with assert_raises(TypeError):
-        Connection(EASYBASE_HOST, EASYBASE_PORT, autoconnect=False, table_prefix=6.4)
+        Connection(EASYBASE_HOST, EASYBASE_PORT, compat="0.98", autoconnect=False, table_prefix=6.4)
 
 
 def test_families():
