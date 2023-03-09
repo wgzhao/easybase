@@ -17,7 +17,7 @@ except ImportError:
     try:
         # External package for Python 2.6
         from ordereddict import OrderedDict
-    except ImportError as exc:
+    except ImportError:
         # Stub to throw errors at run-time (not import time)
         def OrderedDict(*args, **kwargs):
             raise RuntimeError(
