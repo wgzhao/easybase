@@ -10,3 +10,7 @@ thriftpy2.load(
     resource_filename('easybase', 'HBase.thrift'),
     module_name='HBase_thrift'
 )
+
+from .connection import DEFAULT_HOST, DEFAULT_PORT, Connection
+from .table import Table
+from .pool import ConnectionPool, NoConnectionsAvailable
