@@ -1,7 +1,6 @@
 #!/bin/bash -eux
 sudo apt-get update
-sudo apt-get -q install -y wget openjdk-8-jdk-headless
-#sudo update-java-alternatives -s java-8-oracle
+sudo apt-get -q install -y wget openjdk-17-jdk-headless
 
 # download and install hbase 2.4.x
 ver='2.4.18'

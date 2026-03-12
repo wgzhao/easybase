@@ -35,7 +35,7 @@ THRIFT_PROTOCOLS = dict(
 DEFAULT_HOST = 'localhost'
 DEFAULT_PORT = 9090
 DEFAULT_TRANSPORT = 'buffered'
-DEFAULT_COMPAT = '0.96'
+DEFAULT_COMPAT = '2.2.0'
 DEFAULT_PROTOCOL = 'binary'
 
 class Connection(object):
