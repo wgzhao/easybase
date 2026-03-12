@@ -8,6 +8,7 @@ from operator import attrgetter
 from struct import Struct
 
 from HBase_thrift import TScan, TGet, TColumnValue, TPut, TColumn, TTimeRange, TDelete, TTableName
+from HBase_thrift import TMutation, TRowMutations
 
 from .util import str_increment, OrderedDict
 
@@ -609,8 +610,96 @@ class Table(object):
         :return: Batch instance
         :rtype: :py:class:`Batch`
         """
-        raise NotImplementedError
-        # kwargs = locals().copy()
+        return _Batch(table=self, timestamp=timestamp,
+                      batch_size=batch_size, transaction=transaction)
+
+
+class _Batch(object):
+    """Batch mutation helper for HBase Thrift2.
+
+    The interface mirrors HappyBase style: collect puts/deletes and flush on
+    demand, optionally bounded by `batch_size`, and supports transactional
+    context-manager semantics when `transaction=True`.
+    """
+
+    def __init__(self, table, timestamp=None, batch_size=None, transaction=False):
+        # type: (Table, int, int, bool) -> None
+        if not (timestamp is None or isinstance(timestamp, int)):
+            raise TypeError("'timestamp' must be an integer or None")
+
+        if batch_size is not None:
+            if not batch_size > 0:
+                raise ValueError("'batch_size' must be > 0")
+        if transaction and batch_size is not None:
+            raise TypeError("'transaction' cannot be used when 'batch_size' is specified")
+
+        self._table = table
+        self._timestamp = timestamp
+        self._batch_size = batch_size
+        self._transaction = transaction
+        self._mutations = {}
+        self._mutation_count = 0
+
+    def _ensure_row_bucket(self, row):
+        bucket = self._mutations.get(row)
+        if bucket is None:
+            bucket = []
+            self._mutations[row] = bucket
+        return bucket
 
         # del kwargs['self']
         # return Batch(table=self, **kwargs)
+    def put(self, row, data, wal=True, timestamp=None):
+        # type: (str, dict, bool, int) -> None
+        cols = make_columnvalue(data)
+        tput = TPut(row=row.encode(), columnValues=cols,
+                    durability=wal, timestamp=timestamp or self._timestamp)
+        mutation = TMutation(put=tput)
+        bucket = self._ensure_row_bucket(row)
+        bucket.append(mutation)
+        self._mutation_count += len(data)
+        self._maybe_send()
+
+    def delete(self, row, columns=None, timestamp=None, deletetype=1, attributes=None, durability=False):
+        # type: (str, list, int, int, dict, bool) -> None
+        cols = make_columns(columns)
+        tdelete = TDelete(row=row.encode(), columns=cols,
+                          timestamp=timestamp or self._timestamp,
+                          deleteType=deletetype,
+                          attributes=attributes,
+                          durability=durability)
+        mutation = TMutation(deleteSingle=tdelete)
+        bucket = self._ensure_row_bucket(row)
+        bucket.append(mutation)
+        if columns is None:
+            # count as one mutation when whole row delete
+            self._mutation_count += 1
+        else:
+            self._mutation_count += len(columns)
+        self._maybe_send()
+
+    def send(self):
+        """Flush buffered mutations to HBase."""
+        if not self._mutations:
+            return
+
+        table_name = self._table.name.encode()
+        for row, mutations in self._mutations.items():
+            trow = TRowMutations(row=row.encode(), mutations=mutations)
+            self._table.connection.client.mutateRow(table_name, trow)
+
+        self._mutations.clear()
+        self._mutation_count = 0
+
+    def _maybe_send(self):
+        if self._batch_size and self._mutation_count >= self._batch_size:
+            self.send()
+
+    # Context manager support
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None or not self._transaction:
+            self.send()
+        # transactional mode drops pending mutations on exception by not sending
