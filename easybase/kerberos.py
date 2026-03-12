@@ -1,7 +1,6 @@
 from io import BytesIO
 from struct import pack, unpack
 
-import six
 from thriftpy2.transport import TTransportBase, TTransportException
 try:
     from thriftpy2.transport import readall
@@ -21,7 +20,7 @@ class TSaslClientTransport(TTransportBase):
     ERROR = 4
     COMPLETE = 5
 
-    def __init__(self, transport, host, service, mechanism=six.u('GSSAPI'),
+    def __init__(self, transport, host, service, mechanism='GSSAPI',
                  **sasl_kwargs):
         """
         transport: an underlying transport to use, typically just a TSocket
@@ -34,8 +33,6 @@ class TSaslClientTransport(TTransportBase):
 
         self.transport = transport
 
-        # if six.PY3:
-        #     self._patch_pure_sasl()
         self.sasl = SASLClient(host, service, mechanism, **sasl_kwargs)
 
         self.__wbuf = BytesIO()
@@ -96,14 +93,7 @@ class TSaslClientTransport(TTransportBase):
     def flush(self):
         data = self.__wbuf.getvalue()
         encoded = self.sasl.wrap(data)
-        if six.PY2:
-            self.transport.write(''.join([
-                pack("!i", len(encoded)),
-                encoded
-            ])
-            )
-        else:
-            self.transport.write(b''.join((pack("!i", len(encoded)), encoded)))
+        self.transport.write(b''.join((pack("!i", len(encoded)), encoded)))
         self.transport.flush()
         self.__wbuf = BytesIO()
 

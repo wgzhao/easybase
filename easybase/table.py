@@ -3,7 +3,6 @@ EasyBase table module.
 """
 import time
 import logging
-from six import iteritems
 from operator import attrgetter
 from struct import Struct
 
@@ -60,7 +59,7 @@ def make_columnvalue(data):
     :return list of TColumnValue
     """
     cols = []
-    for column, value in iteritems(data):
+    for column, value in data.items():
         f, q = column.split(":")
         cols.append(TColumnValue(family=f.encode(),
                     qualifier=q.encode(), value=value))
@@ -141,7 +140,7 @@ class Table(object):
         families = {}
         for cf in descriptor.columns:
             families[cf.name.decode()] = {k.decode(): v.decode()
-                                          for k, v in iteritems(cf.attributes)}
+                                          for k, v in cf.attributes.items()}
         # families = {cf.name.decode(): cf.attributes for cf in descriptor.columns}
 
         return families
@@ -452,7 +451,7 @@ class Table(object):
         :param dict rows: contains multiple number of `row`
         """
         tputs = []
-        for rk, item in iteritems(rows):
+        for rk, item in rows.items():
             cols = make_columnvalue(item['data'])
             tput = TPut(row=rk.encode(), columnValues=cols,
                         durability=item.get('wal', True),
@@ -585,7 +584,7 @@ class Table(object):
         if isinstance(obj, bytes):
             return obj.decode()
         if isinstance(obj, dict):
-            return {x.decode(): y.decode() for x, y in iteritems(obj)}
+            return {x.decode(): y.decode() for x, y in obj.items()}
 
     def batch(self, timestamp=None, batch_size=None, transaction=False):
         """Create a new batch operation for current table

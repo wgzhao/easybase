@@ -6,9 +6,6 @@ import os
 import random
 import threading
 
-from six.moves import range
-from six import text_type, iteritems
-
 from thriftpy2.thrift import TDecodeException
 
 from nose.tools import (
@@ -29,7 +26,7 @@ from easybase.pool import ConnectionPool, NoConnectionsAvailable
 
 EASYBASE_HOST = os.environ.get('EASYBASE_HOST', '127.0.0.1')
 EASYBASE_PORT = os.environ.get('EASYBASE_PORT', 9090)
-EASYBASE_COMPAT = os.environ.get('EASYBASE_COMPAT', '0.98')
+EASYBASE_COMPAT = os.environ.get('EASYBASE_COMPAT', '2.2.0')
 EASYBASE_TRANSPORT = os.environ.get('EASYBASE_TRANSPORT', 'buffered')
 
 TABLE_PREFIX = 'easybase_test_tmp'
@@ -119,8 +116,8 @@ def test_prefix():
 
 def test_families():
     families = tbl.families()
-    for name, fdesc in iteritems(families):
-        assert_is_instance(name, text_type)
+    for name, fdesc in families.items():
+        assert_is_instance(name, str)
         assert_is_instance(fdesc, dict)
         # assert_is_instance(fdesc['BLOCKSIZE'], int)
         assert_in('VERSIONS', fdesc)
@@ -401,6 +398,39 @@ def test_delete():
     assert_dict_equal({}, tbl.row(rk))
 
 
+def test_batch_put_and_delete():
+    rk1, rk2 = 'rk_batch_1', 'rk_batch_2'
+    # batch put with automatic flush via batch_size
+    with tbl.batch(batch_size=2) as b:
+        b.put(rk1, {'cf1:c1': 'v1'})
+        b.put(rk2, {'cf1:c1': 'v2'})
+
+    assert_dict_equal({'cf1:c1': 'v1'}, tbl.row(rk1))
+    assert_dict_equal({'cf1:c1': 'v2'}, tbl.row(rk2))
+
+    # delete via batch
+    with tbl.batch() as b:
+        b.delete(rk1)
+        b.delete(rk2, ['cf1:c1'])
+
+    assert_dict_equal({}, tbl.row(rk1))
+    assert_dict_equal({}, tbl.row(rk2))
+
+
+def test_batch_transaction_rollback_on_exception():
+    rk = 'rk_batch_tx'
+
+    try:
+        with tbl.batch(transaction=True) as b:
+            b.put(rk, {'cf1:c1': 'v_tx'})
+            raise RuntimeError("trigger rollback")
+    except RuntimeError:
+        pass
+
+    # transactional batch should not flush when exception occurs
+    assert_dict_equal({}, tbl.row(rk))
+
+
 def test_connection_pool():
     from thriftpy2.thrift import TException
 
@@ -408,10 +438,10 @@ def test_connection_pool():
         name = threading.current_thread().name
         print("Thread %s starting" % name)
 
-        def inner_function():
-            # Nested connection requests must return the same connection
+        def inner_function(current_conn):
+            # Nested connection requests must return the same connection within the same thread
             with pool.connection() as another_connection:
-                assert connection is another_connection
+                assert current_conn is another_connection
 
                 # Fake an exception once in a while
                 if random.random() < .25:
@@ -424,7 +454,7 @@ def test_connection_pool():
                 conn.table(TEST_TABLE_NAME)
 
                 try:
-                    inner_function()
+                    inner_function(conn)
                 except TException:
                     # This error should have been picked up by the
                     # connection pool, and the connection should have

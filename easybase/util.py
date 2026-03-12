@@ -5,24 +5,11 @@ These functions are not part of the public API.
 """
 
 import re
-from six.moves import xrange
 
 CAPITALS = re.compile('([A-Z])')
 
 
-try:
-    # Python 2.7
-    from collections import OrderedDict
-except ImportError:
-    try:
-        # External package for Python 2.6
-        from ordereddict import OrderedDict
-    except ImportError:
-        # Stub to throw errors at run-time (not import time)
-        def OrderedDict(*args, **kwargs):
-            raise RuntimeError(
-                "No OrderedDict implementation available; please "
-                "install the 'ordereddict' Package from PyPI.")
+from collections import OrderedDict
 
 
 def camel_case_to_pep8(name):
@@ -65,7 +52,7 @@ def str_increment(s):
     drops everything after it. If the string only contains ``0xFF`` bytes,
     `None` is returned.
     """
-    for i in xrange(len(s) - 1, -1, -1):
+    for i in range(len(s) - 1, -1, -1):
         if s[i] != '\xff':
             return s[:i] + chr(ord(s[i]) + 1)
 

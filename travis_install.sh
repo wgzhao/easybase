@@ -3,8 +3,8 @@ sudo apt-get update
 sudo apt-get -q install -y wget openjdk-8-jdk-headless
 #sudo update-java-alternatives -s java-8-oracle
 
-# download and install hbase 2.2.x
-ver='2.2.5'
+# download and install hbase 2.4.x
+ver='2.4.18'
 tarball="hbase-${ver}-bin.tar.gz"
 wget -q -O /tmp/${tarball} https://archive.apache.org/dist/hbase/${ver}/${tarball}
 
@@ -37,6 +37,6 @@ export PATH=$PATH:$HBASE_HOME/bin
 
 #start hbase server and thriftserver
 bin/start-hbase.sh
-sleep 2
+sleep 5
 bin/hbase-daemon.sh start thrift2
 sleep 2

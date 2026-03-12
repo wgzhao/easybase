@@ -5,7 +5,6 @@ EasyBase connection module.
 """
 
 import logging
-from six import iteritems, binary_type, text_type
 
 from thriftpy2.thrift import TApplicationException
 
@@ -38,9 +37,6 @@ DEFAULT_PORT = 9090
 DEFAULT_TRANSPORT = 'buffered'
 DEFAULT_COMPAT = '0.96'
 DEFAULT_PROTOCOL = 'binary'
-
-STRING_OR_BINARY = (binary_type, text_type)
-
 
 class Connection(object):
     """Connection to an HBase Thrift server.
@@ -307,13 +303,13 @@ class Connection(object):
 
         # table_descriptors = [{'tableName': name.encode()}]
         family_desc = []
-        for cf_name, options in iteritems(families):
+        for cf_name, options in families.items():
             if options is None:
                 options = dict()
 
             kwargs = dict()
-            for option_name, value in iteritems(options):
-                if isinstance(value, STRING_OR_BINARY):
+            for option_name, value in options.items():
+                if isinstance(value, str):
                     value = value.encode()
 
                 kwargs[pep8_to_camel_case(option_name)] = value
